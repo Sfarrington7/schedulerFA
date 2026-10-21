@@ -1,1 +1,2 @@
 Connection test: this file was added from a Claude Code session on 2026-10-21 to confirm we can commit and push to this repo.
+Discord notification test: this line was added in a pull request.
