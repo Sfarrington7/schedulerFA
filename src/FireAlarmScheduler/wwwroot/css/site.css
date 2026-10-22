@@ -1,5 +1,10 @@
+/* Site-wide styles: a plain industrial look on top of Bootstrap, readable on phones. */
+:root {
+  --app-accent: #b3261e;
+}
+
 html {
-  font-size: 14px;
+  font-size: 15px;
 }
 
 @media (min-width: 768px) {
@@ -8,24 +13,71 @@ html {
   }
 }
 
-.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
-  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
-}
-
-html {
-  position: relative;
-  min-height: 100%;
-}
-
 body {
-  margin-bottom: 60px;
+  background-color: #f4f5f7;
 }
 
-.form-floating > .form-control-plaintext::placeholder, .form-floating > .form-control::placeholder {
-  color: var(--bs-secondary-color);
-  text-align: end;
+.app-navbar {
+  background-color: #23272b;
+  border-bottom: 4px solid var(--app-accent);
 }
 
-.form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
-  text-align: start;
+.app-navbar .nav-link.active {
+  color: #fff;
+  border-bottom: 2px solid #fff;
+}
+
+.card {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .06);
+}
+
+.btn-primary {
+  background-color: var(--app-accent);
+  border-color: var(--app-accent);
+}
+
+.btn-primary:hover,
+.btn-primary:focus {
+  background-color: #8f1e18;
+  border-color: #8f1e18;
+}
+
+.job-item {
+  border-left: 4px solid var(--app-accent);
+}
+
+/* Weekly grid: keep day columns narrow so the whole week fits on a laptop; scroll on phones. */
+.schedule-grid th,
+.schedule-grid td {
+  min-width: 8rem;
+  vertical-align: top;
+}
+
+.schedule-grid .today {
+  background-color: #fff6e5;
+}
+
+.schedule-chip {
+  display: block;
+  padding: .15rem .35rem;
+  margin-bottom: .25rem;
+  font-size: .8rem;
+  border-radius: .25rem;
+  background-color: #e9ecef;
+  color: inherit;
+  text-decoration: none;
+}
+
+.schedule-chip:hover {
+  background-color: #dee2e6;
+}
+
+/* Large tap targets for file downloads in the field. */
+.file-link {
+  min-height: 2.75rem;
+}
+
+/* Keep line breaks typed into notes fields. */
+.notes {
+  white-space: pre-line;
 }

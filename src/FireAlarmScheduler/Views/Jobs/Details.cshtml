@@ -1,0 +1,66 @@
+@* Team lead job page: job facts, and the job's buildings with links to manage each building's files. *@
+@model JobDetailsViewModel
+@{
+    ViewData["Title"] = Model.Summary.Name;
+}
+
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a asp-action="Index">Jobs</a></li>
+        <li class="breadcrumb-item active" aria-current="page">@Model.Summary.Name</li>
+    </ol>
+</nav>
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h1 class="h3 mb-0">@Model.Summary.Name</h1>
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-secondary" asp-action="Edit" asp-route-id="@Model.Summary.Id">Edit job</a>
+        <a class="btn btn-outline-danger" asp-action="Delete" asp-route-id="@Model.Summary.Id">Delete job</a>
+    </div>
+</div>
+
+<div class="card card-body mb-3">
+    <partial name="_JobInfo" model="Model" />
+</div>
+
+<div class="card">
+    <div class="card-header fw-semibold">Buildings</div>
+    @if (Model.Buildings.Count == 0)
+    {
+        <div class="card-body text-body-secondary">No buildings yet. Add each building at this location, then upload its device spreadsheets.</div>
+    }
+    else
+    {
+        <div class="list-group list-group-flush">
+            @foreach (var building in Model.Buildings)
+            {
+                <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+                   asp-controller="Buildings" asp-action="Details" asp-route-jobId="@Model.Summary.Id" asp-route-buildingId="@building.Id">
+                    <span>
+                        <strong>@building.Name</strong>
+                        @if (building.Notes is not null)
+                        {
+                            <span class="small text-body-secondary d-block">@building.Notes</span>
+                        }
+                    </span>
+                    <span class="badge text-bg-secondary">@building.Files.Count file(s)</span>
+                </a>
+            }
+        </div>
+    }
+    <div class="card-footer">
+        <form asp-controller="Buildings" asp-action="Create" asp-route-jobId="@Model.Summary.Id" method="post" class="row g-2 align-items-end">
+            <div class="col-sm-4">
+                <label asp-for="NewBuilding.Name" class="form-label small mb-1"></label>
+                <input asp-for="NewBuilding.Name" class="form-control" placeholder="e.g. Building A" />
+            </div>
+            <div class="col-sm-6">
+                <label asp-for="NewBuilding.Notes" class="form-label small mb-1"></label>
+                <input asp-for="NewBuilding.Notes" class="form-control" />
+            </div>
+            <div class="col-sm-2 d-grid">
+                <button type="submit" class="btn btn-primary">Add building</button>
+            </div>
+        </form>
+    </div>
+</div>

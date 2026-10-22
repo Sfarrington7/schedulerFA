@@ -1,0 +1,19 @@
+@* One job in a date-organized list: name, status, dates, times, address, technicians, buildings.
+   Set ViewData["JobUrl"] to override the link target (used by the technician view). *@
+@model JobSummaryViewModel
+@{
+    var url = ViewData["JobUrl"] as string ?? Url.Action("Details", "Jobs", new { id = Model.Id });
+}
+<a href="@url" class="list-group-item list-group-item-action job-item">
+    <div class="d-flex justify-content-between align-items-start gap-2">
+        <strong>@Model.Name</strong>
+        <partial name="_StatusBadge" model="Model.Status" />
+    </div>
+    <div class="small">@Model.DateRangeText · @Model.TimeRangeText</div>
+    <div class="small text-body-secondary">@Model.Address@(Model.SiteName is null ? "" : $" ({Model.SiteName})")</div>
+    <div class="small"><span class="text-body-secondary">Technicians:</span> @Model.TechnicianNamesText</div>
+    @if (Model.BuildingNames.Count > 0)
+    {
+        <div class="small"><span class="text-body-secondary">Buildings:</span> @string.Join(", ", Model.BuildingNames)</div>
+    }
+</a>

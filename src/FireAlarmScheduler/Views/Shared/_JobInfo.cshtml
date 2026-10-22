@@ -1,0 +1,32 @@
+@* Read-only job facts shared by the team lead and technician job pages. *@
+@model JobDetailsViewModel
+@{
+    var job = Model.Summary;
+}
+<dl class="row mb-0">
+    <dt class="col-sm-3">Status</dt>
+    <dd class="col-sm-9"><partial name="_StatusBadge" model="job.Status" /></dd>
+    @if (job.CustomerName is not null)
+    {
+        <dt class="col-sm-3">Customer</dt>
+        <dd class="col-sm-9">@job.CustomerName</dd>
+    }
+    @if (job.SiteName is not null)
+    {
+        <dt class="col-sm-3">Site</dt>
+        <dd class="col-sm-9">@job.SiteName</dd>
+    }
+    <dt class="col-sm-3">Address</dt>
+    <dd class="col-sm-9">@job.Address</dd>
+    <dt class="col-sm-3">Dates</dt>
+    <dd class="col-sm-9">@job.DateRangeText</dd>
+    <dt class="col-sm-3">Daily hours</dt>
+    <dd class="col-sm-9">@job.TimeRangeText</dd>
+    <dt class="col-sm-3">Technicians</dt>
+    <dd class="col-sm-9">@job.TechnicianNamesText</dd>
+    @if (Model.Notes is not null)
+    {
+        <dt class="col-sm-3">Notes</dt>
+        <dd class="col-sm-9 notes">@Model.Notes</dd>
+    }
+</dl>
