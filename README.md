@@ -30,7 +30,7 @@ Authentication, role-based permissions, multi-company support, relational databa
 | --- | --- |
 | Framework | ASP.NET Core / .NET 10 |
 | Language | C# |
-| UI | Blazor with Interactive Server rendering |
+| UI | ASP.NET Core MVC with Razor views (no code-behind) |
 | Data persistence | Local JSON files |
 | Uploaded documents | Local filesystem, outside `wwwroot` |
 | Testing | xUnit (`dotnet test`) |
@@ -58,10 +58,12 @@ FireAlarmScheduler/
 ├── CLAUDE.md                 # AI contributor instructions
 ├── README.md                 # Project goals and setup
 ├── src/
-│   └── FireAlarmScheduler/   # Blazor application
-│       ├── Components/       # Pages and UI components
-│       ├── Models/           # Technician, Job, Building, UploadedFile
-│       ├── Services/         # Scheduling and document operations
+│   └── FireAlarmScheduler/   # ASP.NET Core MVC application
+│       ├── Controllers/      # Request handling, one controller per feature
+│       ├── Views/            # Razor views, a subfolder per controller + Shared/
+│       ├── Models/           # View models and form/input models
+│       ├── Entities/         # Technician, Job, Building, UploadedFile
+│       ├── Services/         # Scheduling, persistence, and document operations
 │       └── ...
 └── tests/
     ├── README.md            # Test instructions and coverage map
@@ -91,7 +93,7 @@ See [`CLAUDE.md`](CLAUDE.md) for the project-wide development rules. Claude shou
 
 Key expectations:
 - File-level summaries on every handwritten source file; concise notes above complex functions.
-- Clear separation of UI components, business rules, and storage code.
+- Clear separation of controllers, views, models, entities, business rules, and storage code.
 - Automated xUnit tests for every feature/bug fix, including failures and edge cases.
 - Tests use isolated temporary data; run `dotnet build` and `dotnet test` before marking work complete.
 - When the test project is created, document test suites and execution in `tests/README.md`.
@@ -104,7 +106,7 @@ File uploads are untrusted. Validate types/sizes on the server; store them outsi
 
 ## Development order
 
-1. Scaffold .NET 10 Blazor app and xUnit test project; document setup.
+1. Scaffold .NET 10 ASP.NET Core MVC app and xUnit test project; document setup.
 2. Add technician management with JSON persistence and tests.
 3. Add jobs, scheduling, technician assignments, and tests.
 4. Add buildings and secure file upload/download functionality with tests.
@@ -116,6 +118,7 @@ File uploads are untrusted. Validate types/sizes on the server; store them outsi
 - **Current milestone:** Planning and project setup.
 - **Decision:** Start with local JSON/filesystem storage to avoid database setup.
 - **Decision:** Use a prototype view selector instead of login; never represent it as security.
+- **Decision:** Use ASP.NET Core MVC instead of Blazor, with separate `Controllers/`, `Views/`, `Models/`, and `Entities/` folders and no Razor code-behind.
 - **Open before real deployment:** Accounts, permissions, shared hosting, persistent database, backups, and customer-data protections.
 
 Keep this section current as changes are implemented.
