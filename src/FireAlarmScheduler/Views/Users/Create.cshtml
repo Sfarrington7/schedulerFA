@@ -1,0 +1,18 @@
+@* Create a new sign-in account with an initial password and roles. *@
+@model UserFormModel
+@{
+    ViewData["Title"] = "Add user";
+}
+
+<h1 class="h3">Add user</h1>
+<form asp-action="Create" method="post" class="card card-body" style="max-width: 48rem">
+    <partial name="_Form" model="Model" />
+    <div class="mt-3 d-flex gap-2">
+        <button type="submit" class="btn btn-primary">Add user</button>
+        <a class="btn btn-outline-secondary" asp-action="Index">Cancel</a>
+    </div>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

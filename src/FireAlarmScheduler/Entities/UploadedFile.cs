@@ -1,4 +1,4 @@
-// Purpose: Metadata for a spreadsheet uploaded to a building.
+// Purpose: Metadata for a spreadsheet uploaded to a building (the UploadedFiles table).
 // The file bytes live in local file storage under StoredFileName; OriginalFileName is display-only.
 namespace FireAlarmScheduler.Entities;
 

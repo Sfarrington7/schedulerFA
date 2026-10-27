@@ -81,3 +81,7 @@ body {
 .notes {
   white-space: pre-line;
 }
+
+.app-navbar .nav-link {
+  white-space: nowrap;
+}

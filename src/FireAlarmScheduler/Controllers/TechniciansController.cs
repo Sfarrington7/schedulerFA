@@ -1,10 +1,12 @@
-// Purpose: Team management pages for the team lead: list, add, edit, and remove technicians.
+// Purpose: Team management pages for team leads and administrators: list, add, edit, and remove technicians.
 using FireAlarmScheduler.Models;
 using FireAlarmScheduler.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FireAlarmScheduler.Controllers;
 
+[Authorize(Policy = AppPolicies.ManageSchedule)]
 public class TechniciansController : Controller
 {
     private readonly TechnicianService _technicianService;

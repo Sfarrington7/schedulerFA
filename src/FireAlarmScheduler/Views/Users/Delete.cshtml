@@ -1,0 +1,19 @@
+@* Confirm deleting a sign-in account. The linked technician record (if any) is kept. *@
+@model UserListItemViewModel
+@{
+    ViewData["Title"] = "Delete user";
+}
+
+<h1 class="h3">Delete user</h1>
+<div class="card card-body" style="max-width: 40rem">
+    <p>Delete the account for <strong>@Model.DisplayName</strong> (@Model.Email)? They will no longer be able to sign in.
+        @if (Model.TechnicianName is not null)
+        {
+            <text>The technician record for @Model.TechnicianName and their job assignments are kept.</text>
+        }
+    </p>
+    <form asp-action="Delete" asp-route-id="@Model.Id" method="post" class="d-flex gap-2">
+        <button type="submit" class="btn btn-danger">Delete</button>
+        <a class="btn btn-outline-secondary" asp-action="Index">Cancel</a>
+    </form>
+</div>

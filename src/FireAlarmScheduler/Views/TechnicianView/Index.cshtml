@@ -1,4 +1,5 @@
-@* Technician schedule (read-only, mobile-first): pick your name, then see your jobs for a day or week. *@
+@* Technician schedule (read-only, mobile-first): a technician's jobs for a day or week. Team leads and
+   administrators pick the technician; technician accounts always see their own linked schedule. *@
 @model TechnicianScheduleViewModel
 @{
     ViewData["Title"] = "Technician View";
@@ -6,13 +7,20 @@
     var range = Model.Range.ToString();
 }
 
-<h1 class="h3">Technician View</h1>
+<h1 class="h3">@(Model.CanChooseTechnician ? "Technician View" : "My Schedule")</h1>
 
+@if (!Model.CanChooseTechnician && Model.SelectedTechnician is null)
+{
+    <p class="alert alert-warning">Your account isn't linked to a technician yet. Ask an administrator to link it on the Users page.</p>
+}
+
+@if (Model.CanChooseTechnician)
+{
 <form method="get" asp-action="Index" class="card card-body mb-3">
-    <label for="technicianId" class="form-label">Who are you?</label>
+    <label for="technicianId" class="form-label">Technician</label>
     <div class="input-group">
         <select id="technicianId" name="technicianId" class="form-select" onchange="this.form.submit()">
-            <option value="">Select your name…</option>
+            <option value="">Select a technician…</option>
             @foreach (var tech in Model.Technicians)
             {
                 <option value="@tech.Id" selected="@(tech.Id == techId)">@tech.FullName</option>
@@ -27,6 +35,7 @@
         <div class="form-text">No technicians have been added yet.</div>
     }
 </form>
+}
 
 @if (Model.SelectedTechnician is not null)
 {

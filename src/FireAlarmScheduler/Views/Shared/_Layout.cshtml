@@ -1,8 +1,13 @@
-@* Site layout: navigation, the Team Lead / Technician view switch, status messages, and page body. *@
+@* Site layout: role-aware navigation, the signed-in account menu, status messages, and page body. *@
+@using FireAlarmScheduler.Services
+@using Microsoft.AspNetCore.Authorization
+@inject IAuthorizationService AuthorizationService
 @{
     var controller = ViewContext.RouteData.Values["controller"]?.ToString();
-    var isTechnicianView = controller == "TechnicianView";
     string NavClass(string name) => controller == name ? "nav-link active" : "nav-link";
+    var signedIn = User.Identity?.IsAuthenticated == true;
+    var canManageSchedule = signedIn && (await AuthorizationService.AuthorizeAsync(User, AppPolicies.ManageSchedule)).Succeeded;
+    var canManageUsers = signedIn && (await AuthorizationService.AuthorizeAsync(User, AppPolicies.ManageUsers)).Succeeded;
 }
 <!DOCTYPE html>
 <html lang="en">
@@ -15,7 +20,7 @@
 </head>
 <body>
     <header>
-        <nav class="navbar navbar-expand-lg navbar-dark app-navbar mb-3">
+        <nav class="navbar navbar-expand-xl navbar-dark app-navbar mb-3">
             <div class="container-fluid">
                 <a class="navbar-brand fw-semibold" asp-controller="Home" asp-action="Index">Fire Alarm Scheduler</a>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav"
@@ -24,23 +29,40 @@
                 </button>
                 <div class="collapse navbar-collapse" id="mainNav">
                     <ul class="navbar-nav me-auto">
-                        <li class="nav-item"><a class="@NavClass("Home")" asp-controller="Home" asp-action="Index">Dashboard</a></li>
-                        <li class="nav-item"><a class="@NavClass("Schedule")" asp-controller="Schedule" asp-action="Index">Schedule</a></li>
-                        <li class="nav-item"><a class="@NavClass("Jobs")" asp-controller="Jobs" asp-action="Index">Jobs</a></li>
-                        <li class="nav-item"><a class="@NavClass("Technicians")" asp-controller="Technicians" asp-action="Index">Technicians</a></li>
-                        <li class="nav-item"><a class="@NavClass("TechnicianView")" asp-controller="TechnicianView" asp-action="Index">Technician View</a></li>
+                        @if (canManageSchedule)
+                        {
+                            <li class="nav-item"><a class="@NavClass("Home")" asp-controller="Home" asp-action="Index">Dashboard</a></li>
+                            <li class="nav-item"><a class="@NavClass("Schedule")" asp-controller="Schedule" asp-action="Index">Schedule</a></li>
+                            <li class="nav-item"><a class="@NavClass("Jobs")" asp-controller="Jobs" asp-action="Index">Jobs</a></li>
+                            <li class="nav-item"><a class="@NavClass("Technicians")" asp-controller="Technicians" asp-action="Index">Technicians</a></li>
+                        }
+                        @if (signedIn)
+                        {
+                            <li class="nav-item"><a class="@NavClass("TechnicianView")" asp-controller="TechnicianView" asp-action="Index">@(canManageSchedule ? "Technician View" : "My Schedule")</a></li>
+                        }
+                        @if (canManageUsers)
+                        {
+                            <li class="nav-item"><a class="@NavClass("Users")" asp-controller="Users" asp-action="Index">Users</a></li>
+                            <li class="nav-item"><a class="@NavClass("Roles")" asp-controller="Roles" asp-action="Index">Roles</a></li>
+                        }
                     </ul>
-                    <div class="btn-group btn-group-sm my-2 my-lg-0" role="group" aria-label="Switch view">
-                        <a class="btn @(isTechnicianView ? "btn-outline-light" : "btn-light")" asp-controller="Home" asp-action="Index">Team Lead View</a>
-                        <a class="btn @(isTechnicianView ? "btn-light" : "btn-outline-light")" asp-controller="TechnicianView" asp-action="Index">Technician View</a>
-                    </div>
+                    @if (signedIn)
+                    {
+                        <div class="d-flex flex-wrap flex-xl-nowrap align-items-center gap-2 my-2 my-xl-0">
+                            <span class="navbar-text small">@User.Identity!.Name</span>
+                            <a class="btn btn-sm btn-outline-light" asp-controller="Account" asp-action="ChangePassword">Change password</a>
+                            <form asp-controller="Account" asp-action="Logout" method="post" class="d-inline">
+                                <button type="submit" class="btn btn-sm btn-light">Sign out</button>
+                            </form>
+                        </div>
+                    }
                 </div>
             </div>
         </nav>
     </header>
     <div class="container">
         <div class="alert alert-secondary py-1 small" role="note">
-            Prototype for local testing. There is no login, so the view switch is not security. Do not enter real customer or employee data.
+            Prototype for local testing. Do not enter real customer or employee data.
         </div>
         <main role="main" class="pb-3">
             <partial name="_StatusMessages" />

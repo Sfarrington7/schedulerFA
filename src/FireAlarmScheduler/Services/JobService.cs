@@ -58,7 +58,7 @@ public class JobService
             job.EndTime = validated.EndTime;
             job.Status = validated.Status;
             job.Notes = validated.Notes;
-            job.AssignedTechnicianIds = validated.AssignedTechnicianIds;
+            job.SetAssignedTechnicians(validated.AssignedTechnicianIds);
             return true;
         });
     }
@@ -88,7 +88,14 @@ public class JobService
         return await _jobs.UpdateAsync(jobId, job =>
         {
             EnsureUniqueBuildingName(job, buildingName, exceptId: null);
-            var building = new Building { Id = Guid.NewGuid(), Name = buildingName, Notes = Optional(notes) };
+            var building = new Building
+            {
+                Id = Guid.NewGuid(),
+                JobId = job.Id,
+                Name = buildingName,
+                Notes = Optional(notes),
+                SortOrder = job.Buildings.Count == 0 ? 0 : job.Buildings.Max(b => b.SortOrder) + 1
+            };
             job.Buildings.Add(building);
             return building;
         });
@@ -197,7 +204,7 @@ public class JobService
         job.EndTime = input.EndTime;
         job.Status = input.Status;
         job.Notes = Optional(input.Notes);
-        job.AssignedTechnicianIds = input.AssignedTechnicianIds.Distinct().ToList();
+        job.SetAssignedTechnicians(input.AssignedTechnicianIds);
     }
 
     private static void EnsureUniqueBuildingName(Job job, string name, Guid? exceptId)

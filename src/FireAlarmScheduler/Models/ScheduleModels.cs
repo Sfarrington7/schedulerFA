@@ -36,6 +36,8 @@ public enum ScheduleRange
 
 public class TechnicianScheduleViewModel
 {
+    /// <summary>False for technician accounts, which only see their own linked schedule.</summary>
+    public bool CanChooseTechnician { get; init; }
     public List<TechnicianOption> Technicians { get; init; } = [];
     public TechnicianOption? SelectedTechnician { get; init; }
     public ScheduleRange Range { get; init; }

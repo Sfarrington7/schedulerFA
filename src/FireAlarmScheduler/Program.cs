@@ -1,7 +1,12 @@
-// Purpose: Application startup. Registers MVC, JSON-file repositories, local file storage,
-// and the scheduling services, then configures the request pipeline.
+// Purpose: Application startup. Registers MVC, the EF Core (SQLite) database, ASP.NET Core Identity with
+// role-based authorization, local file storage, and the scheduling services, then configures the pipeline.
+using FireAlarmScheduler.Data;
 using FireAlarmScheduler.Entities;
 using FireAlarmScheduler.Services;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -11,24 +16,62 @@ builder.Services.AddControllersWithViews();
 builder.Services.Configure<StorageOptions>(builder.Configuration.GetSection(StorageOptions.SectionName));
 builder.Services.AddSingleton(TimeProvider.System);
 
+// A relative SQLite file path resolves against the content root (like the upload folder), not the working directory.
+var connection = new SqliteConnectionStringBuilder(builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? throw new InvalidOperationException("Connection string 'DefaultConnection' is missing."));
+if (!Path.IsPathRooted(connection.DataSource) && connection.DataSource != ":memory:")
+{
+    connection.DataSource = Path.Combine(builder.Environment.ContentRootPath, connection.DataSource);
+}
+Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(connection.DataSource))!);
+
+// The factory serves the repositories (one short context per operation); Identity uses the scoped context it also registers.
+builder.Services.AddDbContextFactory<AppDbContext>(options => options.UseSqlite(connection.ToString()));
+
+builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
+    {
+        options.User.RequireUniqueEmail = true;
+        options.Password.RequiredLength = 8;
+        options.Lockout.MaxFailedAccessAttempts = 5;
+        options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+    })
+    .AddEntityFrameworkStores<AppDbContext>()
+    .AddDefaultTokenProviders();
+
+// Role changes, locks, and deletions reach signed-in users within a minute instead of the default 30.
+builder.Services.Configure<SecurityStampValidatorOptions>(options => options.ValidationInterval = TimeSpan.FromMinutes(1));
+
+builder.Services.ConfigureApplicationCookie(options =>
+{
+    options.LoginPath = "/Account/Login";
+    options.LogoutPath = "/Account/Logout";
+    options.AccessDeniedPath = "/Account/AccessDenied";
+    options.Cookie.HttpOnly = true;
+    options.SlidingExpiration = true;
+});
+
+// Every page requires sign-in unless marked [AllowAnonymous].
+builder.Services.AddAuthorizationBuilder()
+    .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build())
+    .AddPolicy(AppPolicies.ManageSchedule, policy => policy.RequireRole(AppPolicies.ManageScheduleRoles))
+    .AddPolicy(AppPolicies.ManageUsers, policy => policy.RequireRole(AppPolicies.ManageUsersRoles))
+    .AddPolicy(AppPolicies.ViewSchedule, policy => policy.RequireRole(AppRoles.All));
+
 // Storage paths come from configuration and resolve against the content root, never wwwroot.
-string ResolveStoragePath(IServiceProvider services, Func<StorageOptions, string> select) =>
-    Path.Combine(builder.Environment.ContentRootPath, select(services.GetRequiredService<IOptions<StorageOptions>>().Value));
-
-builder.Services.AddSingleton(services =>
-    new JsonFileStore<Technician>(Path.Combine(ResolveStoragePath(services, o => o.DataDirectory), "technicians.json")));
-builder.Services.AddSingleton(services =>
-    new JsonFileStore<Job>(Path.Combine(ResolveStoragePath(services, o => o.DataDirectory), "jobs.json")));
 builder.Services.AddSingleton<IFileStorage>(services =>
-    new LocalFileStorage(ResolveStoragePath(services, o => o.UploadsDirectory)));
+    new LocalFileStorage(Path.Combine(builder.Environment.ContentRootPath,
+        services.GetRequiredService<IOptions<StorageOptions>>().Value.UploadsDirectory)));
 
-builder.Services.AddSingleton<ITechnicianRepository, JsonTechnicianRepository>();
-builder.Services.AddSingleton<IJobRepository, JsonJobRepository>();
+builder.Services.AddSingleton<ITechnicianRepository, EfTechnicianRepository>();
+builder.Services.AddSingleton<IJobRepository, EfJobRepository>();
 builder.Services.AddScoped<TechnicianService>();
 builder.Services.AddScoped<JobService>();
 builder.Services.AddScoped<BuildingFileService>();
+builder.Services.AddScoped<UserAdministrationService>();
 
 var app = builder.Build();
+
+await DatabaseInitializer.InitializeAsync(app.Services);
 
 if (!app.Environment.IsDevelopment())
 {
@@ -39,9 +82,11 @@ if (!app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseRouting();
 
+app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapStaticAssets();
+// CSS and scripts must load on the sign-in page, so they are exempt from the sign-in fallback policy.
+app.MapStaticAssets().AllowAnonymous();
 
 app.MapControllerRoute(
     name: "default",

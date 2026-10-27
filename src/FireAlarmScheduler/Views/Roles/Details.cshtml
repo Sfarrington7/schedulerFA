@@ -1,0 +1,32 @@
+@* One role's description and the accounts that hold it. *@
+@model RoleDetailsViewModel
+@{
+    ViewData["Title"] = Model.Name;
+}
+
+<a class="btn btn-sm btn-outline-secondary mb-3" asp-action="Index">&larr; Roles</a>
+<h1 class="h3">@Model.Name</h1>
+<p class="text-body-secondary">@Model.Description</p>
+
+@if (Model.Members.Count == 0)
+{
+    <p>No accounts have this role.</p>
+}
+else
+{
+    <div class="list-group" style="max-width: 48rem">
+        @foreach (var user in Model.Members)
+        {
+            <div class="list-group-item d-flex justify-content-between align-items-center">
+                <div>
+                    <div>@user.DisplayName @if (user.IsLocked) { <span class="badge text-bg-danger">Locked</span> }</div>
+                    <div class="small text-body-secondary">@user.Email · @string.Join(", ", user.Roles)</div>
+                </div>
+                @if (user.CanManage)
+                {
+                    <a class="btn btn-sm btn-outline-secondary" asp-controller="Users" asp-action="Edit" asp-route-id="@user.Id">Edit</a>
+                }
+            </div>
+        }
+    </div>
+}

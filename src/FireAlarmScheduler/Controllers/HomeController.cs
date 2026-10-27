@@ -1,7 +1,9 @@
 // Purpose: Team lead dashboard: current and upcoming jobs, the team, and the next two weeks by date.
+// Accounts that can't manage the schedule (technicians) are sent to their own schedule instead.
 using System.Diagnostics;
 using FireAlarmScheduler.Models;
 using FireAlarmScheduler.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FireAlarmScheduler.Controllers;
@@ -24,6 +26,11 @@ public class HomeController : Controller
 
     public async Task<IActionResult> Index()
     {
+        if (!User.CanManageSchedule())
+        {
+            return RedirectToAction("Index", "TechnicianView");
+        }
+
         var today = ScheduleCalendar.Today(_timeProvider);
         var technicians = await _technicianService.GetAllAsync();
         var lookup = technicians.ToLookup();
@@ -48,6 +55,7 @@ public class HomeController : Controller
         return View(model);
     }
 
+    [AllowAnonymous]
     [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
     public IActionResult Error()
     {

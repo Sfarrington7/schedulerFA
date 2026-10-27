@@ -1,10 +1,12 @@
 // Purpose: Team lead's weekly schedule grid showing which technicians are on which jobs each day.
 using FireAlarmScheduler.Models;
 using FireAlarmScheduler.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FireAlarmScheduler.Controllers;
 
+[Authorize(Policy = AppPolicies.ManageSchedule)]
 public class ScheduleController : Controller
 {
     private readonly JobService _jobService;

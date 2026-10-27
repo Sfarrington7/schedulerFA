@@ -1,6 +1,6 @@
-// Purpose: Runs the README's primary workflow end to end over HTTP: add technicians, create and
-// schedule a job, assign technicians, add buildings, upload spreadsheets, then download one
-// from the technician view. Also covers upload rejection and edit/delete flows.
+// Purpose: Runs the README's primary workflow end to end over HTTP: a signed-in team lead adds technicians,
+// creates and schedules a job, assigns technicians, adds buildings, and uploads spreadsheets; then a
+// technician account signs in and downloads one. Also covers upload rejection and edit/delete flows.
 using System.Net;
 using FireAlarmScheduler.Entities;
 using FireAlarmScheduler.Services;
@@ -16,7 +16,7 @@ public class WorkflowTests : IDisposable
 
     public WorkflowTests()
     {
-        _client = _factory.CreateBrowser();
+        _client = _factory.SignInAsNewUserAsync(AppRoles.TeamLead).GetAwaiter().GetResult();
     }
 
     public void Dispose() => _factory.Dispose();
@@ -100,7 +100,7 @@ public class WorkflowTests : IDisposable
         var buildingA = (await JobsAsync())[0].Buildings.Single(b => b.Name == "Building A");
         var fileA = Assert.Single(buildingA.UploadedFiles);
 
-        // Steps 7–8: John's weekly schedule shows the job, address, and buildings; Sara's does not.
+        // Steps 7–8: the team lead can view John's weekly schedule (job, address, buildings); Sara's lacks the job.
         var schedule = await _client.GetStringAsync($"/TechnicianView?technicianId={john.Id}&range=Week&date=2026-11-03");
         Assert.Contains("Central Plaza Annual Fire Alarm Inspection", schedule);
         Assert.Contains("100 Main Street", schedule);
@@ -113,8 +113,17 @@ public class WorkflowTests : IDisposable
         Assert.Contains($"/Jobs/{job.Id}/Buildings/{buildingA.Id}/Files/{fileA.Id}", jobPage);
         Assert.Contains("Check in at the security desk.", jobPage);
 
-        // Step 9: download Building A's spreadsheet, byte for byte, with its original name.
-        var download = await _client.GetAsync($"/Jobs/{job.Id}/Buildings/{buildingA.Id}/Files/{fileA.Id}");
+        // Step 9: John signs in with his own technician account and sees his schedule without choosing a name.
+        await _factory.CreateUserAsync("john@example.test", AppRoles.Technician, john.Id);
+        var johnClient = await _factory.SignInAsync("john@example.test");
+        var johnSchedule = await johnClient.GetStringAsync("/TechnicianView?range=Week&date=2026-11-03");
+        Assert.Contains("My Schedule", johnSchedule);
+        Assert.Contains("Central Plaza Annual Fire Alarm Inspection", johnSchedule);
+        Assert.DoesNotContain("Sara Lee", johnSchedule);
+        Assert.Contains("Building A devices.csv", await johnClient.GetStringAsync($"/TechnicianView/Job/{job.Id}?technicianId={john.Id}"));
+
+        // Step 10: John downloads Building A's spreadsheet, byte for byte, with its original name.
+        var download = await johnClient.GetAsync($"/Jobs/{job.Id}/Buildings/{buildingA.Id}/Files/{fileA.Id}");
         download.EnsureSuccessStatusCode();
         Assert.Equal(buildingABytes, await download.Content.ReadAsByteArrayAsync());
         Assert.Equal("text/csv", download.Content.Headers.ContentType?.MediaType);
@@ -123,6 +132,13 @@ public class WorkflowTests : IDisposable
         // An unassigned technician cannot open the job page through the technician view.
         var saraJob = await _client.GetAsync($"/TechnicianView/Job/{job.Id}?technicianId={sara.Id}");
         Assert.Equal(HttpStatusCode.NotFound, saraJob.StatusCode);
+
+        // Sara's own account can't see or download John's job, even with John's id in the URL.
+        await _factory.CreateUserAsync("sara@example.test", AppRoles.Technician, sara.Id);
+        var saraClient = await _factory.SignInAsync("sara@example.test");
+        Assert.Equal(HttpStatusCode.NotFound, (await saraClient.GetAsync($"/TechnicianView/Job/{job.Id}?technicianId={john.Id}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await saraClient.GetAsync($"/Jobs/{job.Id}/Buildings/{buildingA.Id}/Files/{fileA.Id}")).StatusCode);
+        Assert.DoesNotContain("Central Plaza", await saraClient.GetStringAsync($"/TechnicianView?technicianId={john.Id}&date=2026-11-03"));
     }
 
     [Fact]

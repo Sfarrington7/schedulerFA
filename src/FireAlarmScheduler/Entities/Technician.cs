@@ -1,4 +1,4 @@
-// Purpose: Stored record for a field technician on the team.
+// Purpose: Stored record for a field technician on the team (the Technicians table).
 namespace FireAlarmScheduler.Entities;
 
 public class Technician

@@ -1,5 +1,5 @@
 // Purpose: Team management rules: add, rename, list, and remove technicians.
-// Removing a technician also removes them from every job they were assigned to.
+// Removing a technician also removes them from every job they were assigned to (a database cascade).
 using FireAlarmScheduler.Entities;
 
 namespace FireAlarmScheduler.Services;
@@ -9,12 +9,10 @@ public class TechnicianService
     private const int MaxNameLength = 100;
 
     private readonly ITechnicianRepository _technicians;
-    private readonly IJobRepository _jobs;
 
-    public TechnicianService(ITechnicianRepository technicians, IJobRepository jobs)
+    public TechnicianService(ITechnicianRepository technicians)
     {
         _technicians = technicians;
-        _jobs = jobs;
     }
 
     /// <summary>Returns all technicians sorted by last name, then first name.</summary>
@@ -52,16 +50,7 @@ public class TechnicianService
     }
 
     /// <summary>Deletes the technician and unassigns them from all jobs. Returns false if not found.</summary>
-    public async Task<bool> DeleteAsync(Guid id)
-    {
-        if (!await _technicians.DeleteAsync(id))
-        {
-            return false;
-        }
-
-        await _jobs.UpdateAllAsync(job => job.AssignedTechnicianIds.Remove(id));
-        return true;
-    }
+    public Task<bool> DeleteAsync(Guid id) => _technicians.DeleteAsync(id);
 
     private static string RequireName(string? value, string field, string label)
     {

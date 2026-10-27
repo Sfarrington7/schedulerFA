@@ -1,0 +1,53 @@
+@* Shared create/edit fields for an account: email, display name, roles the administrator may grant,
+   and the linked technician (required for the Technician role). *@
+@model UserFormModel
+<div asp-validation-summary="ModelOnly" class="text-danger"></div>
+<div class="row g-3">
+    <div class="col-sm-6">
+        <label asp-for="Email" class="form-label"></label>
+        <input asp-for="Email" class="form-control" autocomplete="off" autofocus />
+        <span asp-validation-for="Email" class="text-danger small"></span>
+    </div>
+    <div class="col-sm-6">
+        <label asp-for="DisplayName" class="form-label"></label>
+        <input asp-for="DisplayName" class="form-control" />
+        <span asp-validation-for="DisplayName" class="text-danger small"></span>
+    </div>
+    @if (Model.Id is null)
+    {
+        <div class="col-sm-6">
+            <label asp-for="Password" class="form-label">Initial password</label>
+            <input asp-for="Password" class="form-control" autocomplete="new-password" />
+            <span asp-validation-for="Password" class="text-danger small"></span>
+            <div class="form-text">At least 8 characters, with upper- and lower-case letters, a digit, and a symbol.</div>
+        </div>
+    }
+    <div class="col-12">
+        <fieldset>
+            <legend class="form-label fs-6">Roles</legend>
+            @foreach (var role in Model.AssignableRoles)
+            {
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="Roles" value="@role" id="role-@role"
+                           checked="@Model.Roles.Contains(role)" />
+                    <label class="form-check-label" for="role-@role">
+                        @role <span class="small text-body-secondary">— @FireAlarmScheduler.Services.AppRoles.Describe(role)</span>
+                    </label>
+                </div>
+            }
+            <span asp-validation-for="Roles" class="text-danger small"></span>
+        </fieldset>
+    </div>
+    <div class="col-sm-6">
+        <label asp-for="TechnicianId" class="form-label"></label>
+        <select asp-for="TechnicianId" class="form-select">
+            <option value="">None</option>
+            @foreach (var tech in Model.AvailableTechnicians)
+            {
+                <option value="@tech.Id" selected="@(tech.Id == Model.TechnicianId)">@tech.FullName</option>
+            }
+        </select>
+        <span asp-validation-for="TechnicianId" class="text-danger small"></span>
+        <div class="form-text">Required for the Technician role: the account sees this technician's schedule and files.</div>
+    </div>
+</div>

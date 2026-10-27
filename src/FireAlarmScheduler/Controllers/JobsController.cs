@@ -1,10 +1,12 @@
-// Purpose: Job pages for the team lead: list, view, create, edit, and delete jobs and assign technicians.
+// Purpose: Job pages for team leads and administrators: list, view, create, edit, and delete jobs and assign technicians.
 using FireAlarmScheduler.Models;
 using FireAlarmScheduler.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FireAlarmScheduler.Controllers;
 
+[Authorize(Policy = AppPolicies.ManageSchedule)]
 public class JobsController : Controller
 {
     private readonly JobService _jobService;

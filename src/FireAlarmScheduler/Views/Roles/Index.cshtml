@@ -1,0 +1,20 @@
+@* The four fixed roles, what each allows, and how many accounts hold them. *@
+@model List<RoleListItemViewModel>
+@{
+    ViewData["Title"] = "Roles";
+}
+
+<h1 class="h3">Roles</h1>
+<p class="text-body-secondary">Roles are fixed. Change who holds a role from the <a asp-controller="Users" asp-action="Index">Users</a> page.</p>
+<div class="list-group" style="max-width: 48rem">
+    @foreach (var role in Model)
+    {
+        <a class="list-group-item list-group-item-action" asp-action="Details" asp-route-id="@role.Name">
+            <div class="d-flex justify-content-between">
+                <strong>@role.Name</strong>
+                <span class="badge text-bg-secondary">@role.MemberCount @(role.MemberCount == 1 ? "member" : "members")</span>
+            </div>
+            <div class="small text-body-secondary">@role.Description</div>
+        </a>
+    }
+</div>
