@@ -15,6 +15,7 @@ public class JobsController : Controller
 
     public JobsController(JobService jobService, TechnicianService technicianService, TimeProvider timeProvider)
     {
+        //adding a comment to test the git commit hook
         _jobService = jobService;
         _technicianService = technicianService;
         _timeProvider = timeProvider;
