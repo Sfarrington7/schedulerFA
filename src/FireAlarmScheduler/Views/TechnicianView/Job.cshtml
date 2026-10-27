@@ -1,0 +1,48 @@
+@* Technician job page (read-only): job facts and each building's spreadsheets to download. *@
+@model TechnicianJobViewModel
+@{
+    ViewData["Title"] = Model.Job.Summary.Name;
+}
+
+<a class="btn btn-sm btn-outline-secondary mb-3" asp-action="Index" asp-route-technicianId="@Model.Technician.Id">&larr; My schedule</a>
+
+<h1 class="h4">@Model.Job.Summary.Name</h1>
+<p class="small text-body-secondary">Viewing as @Model.Technician.FullName</p>
+
+<div class="card card-body mb-3">
+    <partial name="_JobInfo" model="Model.Job" />
+</div>
+
+<h2 class="h5">Buildings</h2>
+@if (Model.Job.Buildings.Count == 0)
+{
+    <p class="text-body-secondary">No buildings have been added to this job yet.</p>
+}
+@foreach (var building in Model.Job.Buildings)
+{
+    <div class="card mb-3" id="building-@building.Id">
+        <div class="card-header fw-semibold">@building.Name</div>
+        @if (building.Notes is not null)
+        {
+            <div class="card-body pb-0 notes small">@building.Notes</div>
+        }
+        @if (building.Files.Count == 0)
+        {
+            <div class="card-body text-body-secondary small">No spreadsheets uploaded for this building.</div>
+        }
+        else
+        {
+            <div class="list-group list-group-flush">
+                @foreach (var file in building.Files)
+                {
+                    <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center file-link"
+                       asp-controller="Buildings" asp-action="Download"
+                       asp-route-jobId="@Model.Job.Summary.Id" asp-route-buildingId="@building.Id" asp-route-fileId="@file.Id">
+                        <span class="text-break">@file.OriginalFileName</span>
+                        <span class="btn btn-sm btn-primary ms-2">Download</span>
+                    </a>
+                }
+            </div>
+        }
+    </div>
+}

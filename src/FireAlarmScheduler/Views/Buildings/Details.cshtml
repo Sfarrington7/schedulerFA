@@ -1,0 +1,83 @@
+@* Team lead building page: upload, list, download, and delete the building's spreadsheets. *@
+@model BuildingDetailsViewModel
+@{
+    ViewData["Title"] = $"{Model.Building.Name} – {Model.JobName}";
+}
+
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a asp-controller="Jobs" asp-action="Index">Jobs</a></li>
+        <li class="breadcrumb-item"><a asp-controller="Jobs" asp-action="Details" asp-route-id="@Model.JobId">@Model.JobName</a></li>
+        <li class="breadcrumb-item active" aria-current="page">@Model.Building.Name</li>
+    </ol>
+</nav>
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h1 class="h3 mb-0">@Model.Building.Name</h1>
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-secondary" asp-action="Edit" asp-route-jobId="@Model.JobId" asp-route-buildingId="@Model.Building.Id">Rename / notes</a>
+        <form asp-action="Delete" asp-route-jobId="@Model.JobId" asp-route-buildingId="@Model.Building.Id" method="post"
+              onsubmit="return confirm('Delete this building and all of its files?');">
+            <button type="submit" class="btn btn-outline-danger">Delete building</button>
+        </form>
+    </div>
+</div>
+
+@if (Model.Building.Notes is not null)
+{
+    <p class="notes">@Model.Building.Notes</p>
+}
+
+<div class="card mb-3">
+    <div class="card-header fw-semibold">Upload spreadsheets</div>
+    <div class="card-body">
+        <form asp-action="Upload" asp-route-jobId="@Model.JobId" asp-route-buildingId="@Model.Building.Id" method="post" enctype="multipart/form-data">
+            <div class="mb-2">
+                <input type="file" name="files" class="form-control" multiple accept="@Model.AllowedExtensionsText.Replace(" ", "")" />
+                <div class="form-text">Allowed: @Model.AllowedExtensionsText. Up to @Model.MaxFileSizeMegabytes MB per file. You can select several files.</div>
+            </div>
+            <button type="submit" class="btn btn-primary">Upload</button>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header fw-semibold">Files</div>
+    @if (Model.Building.Files.Count == 0)
+    {
+        <div class="card-body text-body-secondary">No files uploaded for this building yet.</div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table mb-0 align-middle">
+                <thead>
+                    <tr>
+                        <th>File</th>
+                        <th class="d-none d-sm-table-cell">Size</th>
+                        <th class="d-none d-sm-table-cell">Uploaded (UTC)</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var file in Model.Building.Files)
+                    {
+                        <tr>
+                            <td class="text-break">@file.OriginalFileName</td>
+                            <td class="d-none d-sm-table-cell">@file.SizeText</td>
+                            <td class="d-none d-sm-table-cell">@file.UploadDateUtc.ToString("yyyy-MM-dd HH:mm")</td>
+                            <td class="text-end text-nowrap">
+                                <a class="btn btn-sm btn-outline-primary" asp-action="Download"
+                                   asp-route-jobId="@Model.JobId" asp-route-buildingId="@Model.Building.Id" asp-route-fileId="@file.Id">Download</a>
+                                <form asp-action="DeleteFile" asp-route-jobId="@Model.JobId" asp-route-buildingId="@Model.Building.Id" asp-route-fileId="@file.Id"
+                                      method="post" class="d-inline" onsubmit="return confirm('Delete this file?');">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>

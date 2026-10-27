@@ -1,0 +1,73 @@
+@* Technician schedule (read-only, mobile-first): a technician's jobs for a day or week. Team leads and
+   administrators pick the technician; technician accounts always see their own linked schedule. *@
+@model TechnicianScheduleViewModel
+@{
+    ViewData["Title"] = "Technician View";
+    var techId = Model.SelectedTechnician?.Id;
+    var range = Model.Range.ToString();
+}
+
+<h1 class="h3">@(Model.CanChooseTechnician ? "Technician View" : "My Schedule")</h1>
+
+@if (!Model.CanChooseTechnician && Model.SelectedTechnician is null)
+{
+    <p class="alert alert-warning">Your account isn't linked to a technician yet. Ask an administrator to link it on the Users page.</p>
+}
+
+@if (Model.CanChooseTechnician)
+{
+<form method="get" asp-action="Index" class="card card-body mb-3">
+    <label for="technicianId" class="form-label">Technician</label>
+    <div class="input-group">
+        <select id="technicianId" name="technicianId" class="form-select" onchange="this.form.submit()">
+            <option value="">Select a technician…</option>
+            @foreach (var tech in Model.Technicians)
+            {
+                <option value="@tech.Id" selected="@(tech.Id == techId)">@tech.FullName</option>
+            }
+        </select>
+        <button type="submit" class="btn btn-primary">Show</button>
+    </div>
+    <input type="hidden" name="range" value="@range" />
+    <input type="hidden" name="date" value="@Model.Date.ToString("yyyy-MM-dd")" />
+    @if (Model.Technicians.Count == 0)
+    {
+        <div class="form-text">No technicians have been added yet.</div>
+    }
+</form>
+}
+
+@if (Model.SelectedTechnician is not null)
+{
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+        <div class="btn-group" role="group" aria-label="Day or week">
+            <a class="btn btn-sm @(Model.Range == ScheduleRange.Day ? "btn-dark" : "btn-outline-dark")"
+               asp-route-technicianId="@techId" asp-route-range="Day" asp-route-date="@Model.Date.ToString("yyyy-MM-dd")">Day</a>
+            <a class="btn btn-sm @(Model.Range == ScheduleRange.Week ? "btn-dark" : "btn-outline-dark")"
+               asp-route-technicianId="@techId" asp-route-range="Week" asp-route-date="@Model.Date.ToString("yyyy-MM-dd")">Week</a>
+        </div>
+        <div class="btn-group" role="group" aria-label="Navigate dates">
+            <a class="btn btn-sm btn-outline-secondary" asp-route-technicianId="@techId" asp-route-range="@range" asp-route-date="@Model.PreviousDate.ToString("yyyy-MM-dd")">&larr;</a>
+            <a class="btn btn-sm btn-outline-secondary" asp-route-technicianId="@techId" asp-route-range="@range" asp-route-date="@Model.Today.ToString("yyyy-MM-dd")">Today</a>
+            <a class="btn btn-sm btn-outline-secondary" asp-route-technicianId="@techId" asp-route-range="@range" asp-route-date="@Model.NextDate.ToString("yyyy-MM-dd")">&rarr;</a>
+        </div>
+    </div>
+    <h2 class="h5">@Model.RangeTitle</h2>
+
+    @if (Model.Days.All(d => d.Jobs.Count == 0))
+    {
+        <p class="text-body-secondary">No jobs assigned to @Model.SelectedTechnician.FullName for this @(Model.Range == ScheduleRange.Day ? "day" : "week").</p>
+    }
+
+    @foreach (var day in Model.Days.Where(d => d.Jobs.Count > 0))
+    {
+        <h3 class="h6 mt-3 @(day.Date == Model.Today ? "text-danger" : "")">@day.Date.ToString("dddd, MMM d")@(day.Date == Model.Today ? " (today)" : "")</h3>
+        <div class="list-group mb-2">
+            @foreach (var job in day.Jobs)
+            {
+                <partial name="_JobListItem" model="job"
+                         view-data='new ViewDataDictionary(ViewData) { ["JobUrl"] = Url.Action("Job", new { id = job.Id, technicianId = techId }) }' />
+            }
+        </div>
+    }
+}

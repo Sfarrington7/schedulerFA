@@ -1,0 +1,81 @@
+@* Shared create/edit form for a job: details, schedule, status, notes, and technician assignment. *@
+@model JobFormModel
+<div asp-validation-summary="ModelOnly" class="text-danger"></div>
+<div class="row g-3">
+    <div class="col-md-6">
+        <label asp-for="Name" class="form-label"></label>
+        <input asp-for="Name" class="form-control" />
+        <span asp-validation-for="Name" class="text-danger small"></span>
+    </div>
+    <div class="col-md-6">
+        <label asp-for="CustomerName" class="form-label"></label>
+        <input asp-for="CustomerName" class="form-control" />
+        <span asp-validation-for="CustomerName" class="text-danger small"></span>
+    </div>
+    <div class="col-md-6">
+        <label asp-for="SiteName" class="form-label"></label>
+        <input asp-for="SiteName" class="form-control" placeholder="e.g. Central Plaza campus" />
+        <span asp-validation-for="SiteName" class="text-danger small"></span>
+    </div>
+    <div class="col-md-6">
+        <label asp-for="Address" class="form-label"></label>
+        <input asp-for="Address" class="form-control" />
+        <span asp-validation-for="Address" class="text-danger small"></span>
+    </div>
+    <div class="col-6 col-md-3">
+        <label asp-for="StartDate" class="form-label"></label>
+        <input asp-for="StartDate" type="date" asp-format="{0:yyyy-MM-dd}" class="form-control" />
+        <span asp-validation-for="StartDate" class="text-danger small"></span>
+    </div>
+    <div class="col-6 col-md-3">
+        <label asp-for="EndDate" class="form-label"></label>
+        <input asp-for="EndDate" type="date" asp-format="{0:yyyy-MM-dd}" class="form-control" />
+        <span asp-validation-for="EndDate" class="text-danger small"></span>
+    </div>
+    <div class="col-6 col-md-3">
+        <label asp-for="StartTime" class="form-label"></label>
+        <input asp-for="StartTime" type="time" asp-format="{0:HH:mm}" class="form-control" />
+        <span asp-validation-for="StartTime" class="text-danger small"></span>
+    </div>
+    <div class="col-6 col-md-3">
+        <label asp-for="EndTime" class="form-label"></label>
+        <input asp-for="EndTime" type="time" asp-format="{0:HH:mm}" class="form-control" />
+        <span asp-validation-for="EndTime" class="text-danger small"></span>
+    </div>
+    <div class="col-md-4">
+        <label asp-for="Status" class="form-label"></label>
+        <select asp-for="Status" class="form-select">
+            @foreach (var status in Enum.GetValues<JobStatus>())
+            {
+                <option value="@status">@status.ToDisplayName()</option>
+            }
+        </select>
+    </div>
+    <div class="col-12">
+        <fieldset>
+            <legend class="form-label fs-6">Assigned technicians</legend>
+            @if (Model.AvailableTechnicians.Count == 0)
+            {
+                <p class="text-body-secondary small mb-0">No technicians yet. <a asp-controller="Technicians" asp-action="Create">Add technicians</a> first, then assign them here.</p>
+            }
+            <div class="row">
+                @foreach (var tech in Model.AvailableTechnicians)
+                {
+                    <div class="col-sm-6 col-md-4">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="AssignedTechnicianIds" value="@tech.Id" id="tech-@tech.Id"
+                                   checked="@Model.AssignedTechnicianIds.Contains(tech.Id)" />
+                            <label class="form-check-label" for="tech-@tech.Id">@tech.FullName</label>
+                        </div>
+                    </div>
+                }
+            </div>
+            <span asp-validation-for="AssignedTechnicianIds" class="text-danger small"></span>
+        </fieldset>
+    </div>
+    <div class="col-12">
+        <label asp-for="Notes" class="form-label"></label>
+        <textarea asp-for="Notes" class="form-control" rows="4" placeholder="Access instructions, contacts, panel location…"></textarea>
+        <span asp-validation-for="Notes" class="text-danger small"></span>
+    </div>
+</div>

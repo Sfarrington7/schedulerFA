@@ -1,0 +1,18 @@
+@* Confirm deleting a job along with its buildings and uploaded files. *@
+@model JobDetailsViewModel
+@{
+    ViewData["Title"] = "Delete job";
+    var fileCount = Model.Buildings.Sum(b => b.Files.Count);
+}
+
+<h1 class="h3">Delete job</h1>
+<div class="card card-body" style="max-width: 48rem">
+    <p>
+        Delete <strong>@Model.Summary.Name</strong> (@Model.Summary.DateRangeText)?
+        This also deletes its @Model.Buildings.Count building(s) and @fileCount uploaded file(s). This cannot be undone.
+    </p>
+    <form asp-action="Delete" asp-route-id="@Model.Summary.Id" method="post" class="d-flex gap-2">
+        <button type="submit" class="btn btn-danger">Delete job</button>
+        <a class="btn btn-outline-secondary" asp-action="Details" asp-route-id="@Model.Summary.Id">Cancel</a>
+    </form>
+</div>

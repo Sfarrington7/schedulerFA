@@ -1,0 +1,57 @@
+@* Team lead weekly grid: one row per technician, one column per day, listing the jobs they're on. *@
+@model WeeklyScheduleViewModel
+@{
+    ViewData["Title"] = "Weekly schedule";
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h1 class="h3 mb-0">Week of @Model.WeekStart.ToString("MMM d") – @Model.WeekEnd.ToString("MMM d, yyyy")</h1>
+    <div class="btn-group">
+        <a class="btn btn-outline-secondary" asp-route-week="@Model.WeekStart.AddDays(-7).ToString("yyyy-MM-dd")">&larr; Previous</a>
+        <a class="btn btn-outline-secondary" asp-route-week="">This week</a>
+        <a class="btn btn-outline-secondary" asp-route-week="@Model.WeekStart.AddDays(7).ToString("yyyy-MM-dd")">Next &rarr;</a>
+    </div>
+</div>
+
+@if (Model.Rows.Count == 0)
+{
+    <p class="text-body-secondary">No technicians or jobs yet. <a asp-controller="Technicians" asp-action="Create">Add technicians</a> and <a asp-controller="Jobs" asp-action="Create">create jobs</a> to fill in the schedule.</p>
+}
+else
+{
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table table-bordered mb-0 schedule-grid">
+                <thead>
+                    <tr>
+                        <th>Technician</th>
+                        @foreach (var day in Model.Days)
+                        {
+                            <th class="@(day == Model.Today ? "today" : "")">@day.ToString("ddd")<br /><span class="fw-normal small">@day.ToString("MMM d")</span></th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in Model.Rows)
+                    {
+                        <tr>
+                            <th class="@(row.TechnicianId is null ? "text-danger" : "")">@row.Label</th>
+                            @for (var i = 0; i < Model.Days.Count; i++)
+                            {
+                                <td class="@(Model.Days[i] == Model.Today ? "today" : "")">
+                                    @foreach (var job in row.JobsByDay[i])
+                                    {
+                                        <a class="schedule-chip" asp-controller="Jobs" asp-action="Details" asp-route-id="@job.Id" title="@job.Address · @job.TimeRangeText">
+                                            @job.Name
+                                            <span class="d-block text-body-secondary">@job.StartTime.ToString("h:mm tt")</span>
+                                        </a>
+                                    }
+                                </td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}

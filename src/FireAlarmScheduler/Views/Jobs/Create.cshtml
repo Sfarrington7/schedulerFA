@@ -1,0 +1,18 @@
+@* Create a new job. Buildings are added on the job page after saving. *@
+@model JobFormModel
+@{
+    ViewData["Title"] = "Create job";
+}
+
+<h1 class="h3">Create job</h1>
+<form asp-action="Create" method="post" class="card card-body">
+    <partial name="_Form" model="Model" />
+    <div class="mt-3 d-flex gap-2">
+        <button type="submit" class="btn btn-primary">Create job</button>
+        <a class="btn btn-outline-secondary" asp-action="Index">Cancel</a>
+    </div>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

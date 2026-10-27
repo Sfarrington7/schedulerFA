@@ -1,0 +1,18 @@
+@* Add a new technician to the team. *@
+@model TechnicianFormModel
+@{
+    ViewData["Title"] = "Add technician";
+}
+
+<h1 class="h3">Add technician</h1>
+<form asp-action="Create" method="post" class="card card-body" style="max-width: 40rem">
+    <partial name="_Form" model="Model" />
+    <div class="mt-3 d-flex gap-2">
+        <button type="submit" class="btn btn-primary">Add technician</button>
+        <a class="btn btn-outline-secondary" asp-action="Index">Cancel</a>
+    </div>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

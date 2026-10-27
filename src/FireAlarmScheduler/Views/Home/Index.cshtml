@@ -1,0 +1,109 @@
+@* Team lead dashboard: current and upcoming jobs, the team, and the next two weeks organized by date. *@
+@model DashboardViewModel
+@{
+    ViewData["Title"] = "Dashboard";
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h1 class="h3 mb-0">Dashboard <small class="text-body-secondary fs-6">@Model.Today.ToString("dddd, MMMM d, yyyy")</small></h1>
+    <div class="d-flex gap-2">
+        <a class="btn btn-primary" asp-controller="Jobs" asp-action="Create">Create job</a>
+        <a class="btn btn-outline-secondary" asp-controller="Technicians" asp-action="Create">Add technician</a>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-8">
+        <div class="card mb-3">
+            <div class="card-header fw-semibold">Current jobs (today)</div>
+            @if (Model.CurrentJobs.Count == 0)
+            {
+                <div class="card-body text-body-secondary">No jobs are running today.</div>
+            }
+            else
+            {
+                <div class="list-group list-group-flush">
+                    @foreach (var job in Model.CurrentJobs)
+                    {
+                        <partial name="_JobListItem" model="job" />
+                    }
+                </div>
+            }
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header fw-semibold">Upcoming jobs</div>
+            @if (Model.UpcomingJobs.Count == 0)
+            {
+                <div class="card-body text-body-secondary">No upcoming jobs. <a asp-controller="Jobs" asp-action="Create">Create one</a>.</div>
+            }
+            else
+            {
+                <div class="list-group list-group-flush">
+                    @foreach (var job in Model.UpcomingJobs)
+                    {
+                        <partial name="_JobListItem" model="job" />
+                    }
+                </div>
+            }
+        </div>
+
+        <div class="card">
+            <div class="card-header d-flex justify-content-between">
+                <span class="fw-semibold">Next 14 days by date</span>
+                <a asp-controller="Schedule" asp-action="Index">Weekly schedule</a>
+            </div>
+            @if (Model.Days.Count == 0)
+            {
+                <div class="card-body text-body-secondary">Nothing scheduled in the next two weeks.</div>
+            }
+            else
+            {
+                <table class="table table-sm mb-0">
+                    <tbody>
+                        @foreach (var day in Model.Days)
+                        {
+                            <tr class="@(day.Date == Model.Today ? "table-warning" : "")">
+                                <th class="text-nowrap ps-3">@day.Date.ToString("ddd, MMM d")</th>
+                                <td>
+                                    @foreach (var job in day.Jobs)
+                                    {
+                                        <div>
+                                            <a asp-controller="Jobs" asp-action="Details" asp-route-id="@job.Id">@job.Name</a>
+                                            <span class="small text-body-secondary">– @job.TechnicianNamesText</span>
+                                        </div>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between">
+                <span class="fw-semibold">Technicians</span>
+                <a asp-controller="Technicians" asp-action="Index">Manage</a>
+            </div>
+            @if (Model.Technicians.Count == 0)
+            {
+                <div class="card-body text-body-secondary">No technicians yet. <a asp-controller="Technicians" asp-action="Create">Add one</a>.</div>
+            }
+            else
+            {
+                <ul class="list-group list-group-flush">
+                    @foreach (var tech in Model.Technicians)
+                    {
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>@tech.FullName</span>
+                            <span class="badge text-bg-light">@tech.UpcomingJobCount current/upcoming</span>
+                        </li>
+                    }
+                </ul>
+            }
+        </div>
+    </div>
+</div>

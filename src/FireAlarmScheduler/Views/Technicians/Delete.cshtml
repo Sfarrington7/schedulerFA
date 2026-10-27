@@ -1,0 +1,14 @@
+@* Confirm removing a technician; they are also unassigned from every job. *@
+@model TechnicianListItemViewModel
+@{
+    ViewData["Title"] = "Remove technician";
+}
+
+<h1 class="h3">Remove technician</h1>
+<div class="card card-body" style="max-width: 40rem">
+    <p>Remove <strong>@Model.FullName</strong> from the team? They will also be unassigned from all of their jobs.</p>
+    <form asp-action="Delete" asp-route-id="@Model.Id" method="post" class="d-flex gap-2">
+        <button type="submit" class="btn btn-danger">Remove</button>
+        <a class="btn btn-outline-secondary" asp-action="Index">Cancel</a>
+    </form>
+</div>

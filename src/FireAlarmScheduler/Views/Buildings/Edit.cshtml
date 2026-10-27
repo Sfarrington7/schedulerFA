@@ -1,0 +1,28 @@
+@* Rename a building or change its notes. *@
+@model BuildingFormModel
+@{
+    ViewData["Title"] = "Edit building";
+}
+
+<h1 class="h3">Edit building <small class="text-body-secondary fs-6">@Model.JobName</small></h1>
+<form asp-action="Edit" asp-route-jobId="@Model.JobId" asp-route-buildingId="@Model.BuildingId" method="post" class="card card-body" style="max-width: 40rem">
+    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+    <div class="mb-3">
+        <label asp-for="Name" class="form-label"></label>
+        <input asp-for="Name" class="form-control" />
+        <span asp-validation-for="Name" class="text-danger small"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="Notes" class="form-label"></label>
+        <textarea asp-for="Notes" class="form-control" rows="3"></textarea>
+        <span asp-validation-for="Notes" class="text-danger small"></span>
+    </div>
+    <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">Save</button>
+        <a class="btn btn-outline-secondary" asp-action="Details" asp-route-jobId="@Model.JobId" asp-route-buildingId="@Model.BuildingId">Cancel</a>
+    </div>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

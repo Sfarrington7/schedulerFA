@@ -1,0 +1,70 @@
+@* User management list: every account with its roles, technician link, and status, plus actions
+   for the accounts the signed-in administrator is allowed to manage. *@
+@model List<UserListItemViewModel>
+@{
+    ViewData["Title"] = "Users";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3 mb-0">Users</h1>
+    <a class="btn btn-primary" asp-action="Create">Add user</a>
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Roles</th>
+                    <th class="d-none d-md-table-cell">Technician</th>
+                    <th class="d-none d-sm-table-cell">Status</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var user in Model)
+                {
+                    <tr>
+                        <td>
+                            <div>@user.DisplayName</div>
+                            <div class="small text-body-secondary">@user.Email</div>
+                        </td>
+                        <td>
+                            @foreach (var role in user.Roles)
+                            {
+                                <span class="badge text-bg-secondary">@role</span>
+                            }
+                        </td>
+                        <td class="d-none d-md-table-cell">@(user.TechnicianName ?? "—")</td>
+                        <td class="d-none d-sm-table-cell">
+                            @if (user.IsLocked)
+                            {
+                                <span class="badge text-bg-danger">Locked</span>
+                            }
+                            else
+                            {
+                                <span class="badge text-bg-success">Active</span>
+                            }
+                        </td>
+                        <td class="text-end text-nowrap">
+                            @if (user.CanManage)
+                            {
+                                <a class="btn btn-sm btn-outline-secondary" asp-action="Edit" asp-route-id="@user.Id">Edit</a>
+                                <a class="btn btn-sm btn-outline-secondary" asp-action="ResetPassword" asp-route-id="@user.Id">Reset password</a>
+                                <form asp-action="@(user.IsLocked ? "Unlock" : "Lock")" asp-route-id="@user.Id" method="post" class="d-inline">
+                                    <button type="submit" class="btn btn-sm btn-outline-warning">@(user.IsLocked ? "Unlock" : "Lock")</button>
+                                </form>
+                                <a class="btn btn-sm btn-outline-danger" asp-action="Delete" asp-route-id="@user.Id">Delete</a>
+                            }
+                            else
+                            {
+                                <span class="small text-body-secondary">SuperAdmin only</span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

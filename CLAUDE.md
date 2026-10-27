@@ -11,11 +11,12 @@ Act as a senior .NET engineer and pragmatic code reviewer. Produce maintainable,
 
 ## MVP technology and scope
 - C# and ASP.NET Core MVC on .NET 10, with Razor views (`.cshtml`). No Blazor and no Razor Pages.
-- Local JSON files for prototype metadata; local filesystem storage for uploaded spreadsheets.
-- One team lead/team, simulated technician selection, no accounts or authentication, no SQL database.
+- EF Core with SQL Server (localhost for development) for all records (schema changes only through EF Core migrations in `Data/Migrations`); local filesystem storage for uploaded spreadsheets.
+- ASP.NET Core Identity for sign-in, with four fixed roles: SuperAdmin, Admin, TeamLead, Technician. Identity screens are MVC controllers/views, not the Razor Pages Identity UI.
+- One team, no self-service registration.
 - Team management; jobs with dates/times, locations, assigned technicians and multiple buildings; per-building Excel uploads/downloads; mobile-friendly technician schedules.
 - Do not introduce React, a separate API/frontend, third-party cloud services, notifications, or complicated patterns unless requested.
-- **Never treat view switching as security.** This unauthenticated prototype is for local development/demo use only, with synthetic data.
+- **Enforce permissions on the server** with `[Authorize]` policies and service checks; hiding a link is never security. This prototype is for local development/demo use only, with synthetic data.
 
 ## Architecture and folder structure (MVC, no code-behind)
 - **Do not put controller logic in Razor code-behind.** Do not create Razor Pages `PageModel` classes (`*.cshtml.cs`), and do not put request handling, data access, or business logic in `@functions` / `@code` blocks inside views.
@@ -29,14 +30,15 @@ Controllers/   MVC controllers, one per feature area (e.g. JobsController.cs)
 Views/         Razor views (.cshtml), in a subfolder per controller (e.g. Views/Jobs/Index.cshtml)
   Shared/      Layouts, partials, _ViewImports.cshtml, _ViewStart.cshtml
 Models/        View models and input/form models passed between controllers and views
-Entities/      Persisted domain data (Technician, Job, Building, UploadedFile)
-Services/      Validation, scheduling rules, JSON persistence, and file storage
+Entities/      Persisted domain data, one SQL table each (Technician, Job, JobAssignment, Building, UploadedFile, ApplicationUser)
+Data/          AppDbContext, database initialization, and EF Core Migrations/
+Services/      Validation, scheduling and account rules, EF Core repositories, and file storage
 ```
 
 - **Entities** represent stored data. Do not pass entities directly to views; map them to a view model in `Models/` first.
 - **Models** shape data for a particular view or form, including validation attributes.
 - Name views after their action: `Views/Jobs/Index.cshtml` for `JobsController.Index()`.
-- Namespaces follow the folders: `FireAlarmScheduler.Controllers`, `FireAlarmScheduler.Models`, `FireAlarmScheduler.Entities`, `FireAlarmScheduler.Services`.
+- Namespaces follow the folders: `FireAlarmScheduler.Controllers`, `FireAlarmScheduler.Models`, `FireAlarmScheduler.Entities`, `FireAlarmScheduler.Data`, `FireAlarmScheduler.Services`.
 
 ## Code design standards
 - Use clear C# naming conventions, nullable reference types, strongly typed models, dependency injection, and async I/O where appropriate.
@@ -82,7 +84,8 @@ For `.cshtml` views use `@* ... *@` at the top. For stylesheets use `/* ... */`.
 
 Important test scenarios as features are implemented:
 - Technician add/edit/delete and selection; job creation/update and assignment; correct daily/weekly filtering; multi-building associations.
-- JSON save/load across application restarts, validation failures, and handling corrupted or missing files without silently discarding data.
+- Database save/load across application restarts (throwaway SQL Server test databases built from the real migrations), cascades, and validation failures that must save nothing.
+- Sign-in, lockout, and first-run setup; each role's page access; technicians limited to their own schedule and files; user-management rules (who may grant which roles, last-SuperAdmin protection).
 - Excel/CSV extension restrictions, max upload size, generated safe storage names, unique file IDs, correct building association, byte-for-byte downloads, and deleted/missing files.
 - Malicious filenames/path traversal and attempts to access unexpected local files.
 
@@ -91,7 +94,7 @@ Important test scenarios as features are implemented:
 - Permit only `.xlsx`, `.xls`, and `.csv` for the MVP. Validate extension and file-size limits on the server; do not trust client-provided filenames, paths, MIME types, or IDs.
 - Generate a unique stored filename and preserve the original name only as metadata/display/download name. Do not overwrite unrelated files.
 - Treat uploads as untrusted content; never execute or automatically parse them. Stream uploads/downloads when practical and dispose streams correctly.
-- Make JSON writes safely (temporary file and atomic replacement when supported) and guard against concurrent updates in the single-server prototype.
+- Never commit database files, connection-string secrets, or default passwords; the first SuperAdmin is created through the first-run setup page.
 - Ignore real data, upload directories, secrets, and build artifacts in source control. Never commit customer records, production spreadsheets, or credentials.
 
 ## Verification and definition of done

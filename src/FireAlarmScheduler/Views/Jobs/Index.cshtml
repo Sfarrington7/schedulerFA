@@ -1,0 +1,51 @@
+@* List of all jobs with schedule, status, technicians, and links to manage each one. *@
+@model List<JobSummaryViewModel>
+@{
+    ViewData["Title"] = "Jobs";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3 mb-0">Jobs</h1>
+    <a class="btn btn-primary" asp-action="Create">Create job</a>
+</div>
+
+@if (Model.Count == 0)
+{
+    <p class="text-body-secondary">No jobs yet.</p>
+}
+else
+{
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0 align-middle">
+                <thead>
+                    <tr>
+                        <th>Job</th>
+                        <th>Dates</th>
+                        <th class="d-none d-md-table-cell">Address</th>
+                        <th class="d-none d-md-table-cell">Technicians</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var job in Model)
+                    {
+                        <tr>
+                            <td>
+                                <a asp-action="Details" asp-route-id="@job.Id" class="fw-semibold">@job.Name</a>
+                                @if (job.CustomerName is not null)
+                                {
+                                    <div class="small text-body-secondary">@job.CustomerName</div>
+                                }
+                            </td>
+                            <td class="small">@job.DateRangeText<br />@job.TimeRangeText</td>
+                            <td class="d-none d-md-table-cell small">@job.Address</td>
+                            <td class="d-none d-md-table-cell small">@job.TechnicianNamesText</td>
+                            <td><partial name="_StatusBadge" model="job.Status" /></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}

@@ -1,0 +1,77 @@
+@* Site layout: role-aware navigation, the signed-in account menu, status messages, and page body. *@
+@using FireAlarmScheduler.Services
+@using Microsoft.AspNetCore.Authorization
+@inject IAuthorizationService AuthorizationService
+@{
+    var controller = ViewContext.RouteData.Values["controller"]?.ToString();
+    string NavClass(string name) => controller == name ? "nav-link active" : "nav-link";
+    var signedIn = User.Identity?.IsAuthenticated == true;
+    var canManageSchedule = signedIn && (await AuthorizationService.AuthorizeAsync(User, AppPolicies.ManageSchedule)).Succeeded;
+    var canManageUsers = signedIn && (await AuthorizationService.AuthorizeAsync(User, AppPolicies.ManageUsers)).Succeeded;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Fire Alarm Scheduler</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body>
+    <header>
+        <nav class="navbar navbar-expand-xl navbar-dark app-navbar mb-3">
+            <div class="container-fluid">
+                <a class="navbar-brand fw-semibold" asp-controller="Home" asp-action="Index">Fire Alarm Scheduler</a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav"
+                        aria-controls="mainNav" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="mainNav">
+                    <ul class="navbar-nav me-auto">
+                        @if (canManageSchedule)
+                        {
+                            <li class="nav-item"><a class="@NavClass("Home")" asp-controller="Home" asp-action="Index">Dashboard</a></li>
+                            <li class="nav-item"><a class="@NavClass("Schedule")" asp-controller="Schedule" asp-action="Index">Schedule</a></li>
+                            <li class="nav-item"><a class="@NavClass("Jobs")" asp-controller="Jobs" asp-action="Index">Jobs</a></li>
+                            <li class="nav-item"><a class="@NavClass("Technicians")" asp-controller="Technicians" asp-action="Index">Technicians</a></li>
+                        }
+                        @if (signedIn)
+                        {
+                            <li class="nav-item"><a class="@NavClass("TechnicianView")" asp-controller="TechnicianView" asp-action="Index">@(canManageSchedule ? "Technician View" : "My Schedule")</a></li>
+                        }
+                        @if (canManageUsers)
+                        {
+                            <li class="nav-item"><a class="@NavClass("Users")" asp-controller="Users" asp-action="Index">Users</a></li>
+                            <li class="nav-item"><a class="@NavClass("Roles")" asp-controller="Roles" asp-action="Index">Roles</a></li>
+                        }
+                    </ul>
+                    @if (signedIn)
+                    {
+                        <div class="d-flex flex-wrap flex-xl-nowrap align-items-center gap-2 my-2 my-xl-0">
+                            <span class="navbar-text small">@User.Identity!.Name</span>
+                            <a class="btn btn-sm btn-outline-light" asp-controller="Account" asp-action="ChangePassword">Change password</a>
+                            <form asp-controller="Account" asp-action="Logout" method="post" class="d-inline">
+                                <button type="submit" class="btn btn-sm btn-light">Sign out</button>
+                            </form>
+                        </div>
+                    }
+                </div>
+            </div>
+        </nav>
+    </header>
+    <div class="container">
+        <div class="alert alert-secondary py-1 small" role="note">
+            Prototype for local testing. Do not enter real customer or employee data.
+        </div>
+        <main role="main" class="pb-3">
+            <partial name="_StatusMessages" />
+            @RenderBody()
+        </main>
+    </div>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>
