@@ -1,11 +1,10 @@
-// Purpose: Application startup. Registers MVC, the EF Core (SQLite) database, ASP.NET Core Identity with
+// Purpose: Application startup. Registers MVC, the EF Core (SQL Server) database, ASP.NET Core Identity with
 // role-based authorization, local file storage, and the scheduling services, then configures the pipeline.
 using FireAlarmScheduler.Data;
 using FireAlarmScheduler.Entities;
 using FireAlarmScheduler.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -16,17 +15,11 @@ builder.Services.AddControllersWithViews();
 builder.Services.Configure<StorageOptions>(builder.Configuration.GetSection(StorageOptions.SectionName));
 builder.Services.AddSingleton(TimeProvider.System);
 
-// A relative SQLite file path resolves against the content root (like the upload folder), not the working directory.
-var connection = new SqliteConnectionStringBuilder(builder.Configuration.GetConnectionString("DefaultConnection")
-    ?? throw new InvalidOperationException("Connection string 'DefaultConnection' is missing."));
-if (!Path.IsPathRooted(connection.DataSource) && connection.DataSource != ":memory:")
-{
-    connection.DataSource = Path.Combine(builder.Environment.ContentRootPath, connection.DataSource);
-}
-Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(connection.DataSource))!);
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? throw new InvalidOperationException("Connection string 'DefaultConnection' is missing.");
 
 // The factory serves the repositories (one short context per operation); Identity uses the scoped context it also registers.
-builder.Services.AddDbContextFactory<AppDbContext>(options => options.UseSqlite(connection.ToString()));
+builder.Services.AddDbContextFactory<AppDbContext>(options => options.UseSqlServer(connectionString));
 
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
     {

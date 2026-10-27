@@ -1,4 +1,4 @@
-// Purpose: Tests the account management rules against real Identity stores on a temporary SQLite database:
+// Purpose: Tests the account management rules against real Identity stores on a throwaway SQL Server database:
 // who may grant which roles, who may change whom, technician links, and last-SuperAdmin protection.
 using FireAlarmScheduler.Services;
 using FireAlarmScheduler.Tests.TestSupport;

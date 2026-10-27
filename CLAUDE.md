@@ -11,7 +11,7 @@ Act as a senior .NET engineer and pragmatic code reviewer. Produce maintainable,
 
 ## MVP technology and scope
 - C# and ASP.NET Core MVC on .NET 10, with Razor views (`.cshtml`). No Blazor and no Razor Pages.
-- EF Core with SQLite for all records (schema changes only through EF Core migrations in `Data/Migrations`); local filesystem storage for uploaded spreadsheets.
+- EF Core with SQL Server (localhost for development) for all records (schema changes only through EF Core migrations in `Data/Migrations`); local filesystem storage for uploaded spreadsheets.
 - ASP.NET Core Identity for sign-in, with four fixed roles: SuperAdmin, Admin, TeamLead, Technician. Identity screens are MVC controllers/views, not the Razor Pages Identity UI.
 - One team, no self-service registration.
 - Team management; jobs with dates/times, locations, assigned technicians and multiple buildings; per-building Excel uploads/downloads; mobile-friendly technician schedules.
@@ -84,7 +84,7 @@ For `.cshtml` views use `@* ... *@` at the top. For stylesheets use `/* ... */`.
 
 Important test scenarios as features are implemented:
 - Technician add/edit/delete and selection; job creation/update and assignment; correct daily/weekly filtering; multi-building associations.
-- Database save/load across application restarts (temporary SQLite files built from the real migrations), cascades, and validation failures that must save nothing.
+- Database save/load across application restarts (throwaway SQL Server test databases built from the real migrations), cascades, and validation failures that must save nothing.
 - Sign-in, lockout, and first-run setup; each role's page access; technicians limited to their own schedule and files; user-management rules (who may grant which roles, last-SuperAdmin protection).
 - Excel/CSV extension restrictions, max upload size, generated safe storage names, unique file IDs, correct building association, byte-for-byte downloads, and deleted/missing files.
 - Malicious filenames/path traversal and attempts to access unexpected local files.

@@ -1,4 +1,4 @@
-// Purpose: Tests SQL persistence through the EF Core repositories on a temporary SQLite database built from
+// Purpose: Tests SQL persistence through the EF Core repositories on a throwaway SQL Server database built from
 // the real migrations: full job graphs survive restarts, rows keep their order, failed changes save nothing,
 // and database cascades clean up assignments and account links.
 using FireAlarmScheduler.Entities;

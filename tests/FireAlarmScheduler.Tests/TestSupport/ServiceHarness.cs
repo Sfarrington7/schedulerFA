@@ -1,5 +1,5 @@
-// Purpose: Builds the real repositories and services (including Identity) over a SQLite database file
-// in a temporary folder for service-level tests. Creating a second harness on the same folder simulates
+// Purpose: Builds the real repositories and services (including Identity) over a throwaway SQL Server
+// database tied to a temporary folder for service-level tests. Creating a second harness on the same folder simulates
 // an application restart. The database schema comes from the app's real EF Core migrations.
 using FireAlarmScheduler.Data;
 using FireAlarmScheduler.Entities;
@@ -19,12 +19,11 @@ public sealed class ServiceHarness
     {
         UploadsDirectory = Path.Combine(rootDirectory, "uploads");
 
-        // Pooling=False closes the file after each operation so the temp folder can always be deleted.
-        var connectionString = $"Data Source={Path.Combine(rootDirectory, "scheduler.db")};Pooling=False";
+        var connectionString = TestDatabase.ConnectionStringFor(TestDatabase.NameFor(rootDirectory));
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddDataProtection();
-        services.AddDbContextFactory<AppDbContext>(options => options.UseSqlite(connectionString));
+        services.AddDbContextFactory<AppDbContext>(options => options.UseSqlServer(connectionString));
         services.AddIdentityCore<ApplicationUser>(options => options.User.RequireUniqueEmail = true)
             .AddRoles<IdentityRole>()
             .AddEntityFrameworkStores<AppDbContext>()

@@ -4,11 +4,20 @@ xUnit tests for the Fire Alarm Scheduler. They run offline and finish in a few s
 
 ## Running
 
-From the repository root:
+Most tests need a **SQL Server** (each test creates and drops its own `FasTest_*` database). By default they connect to `localhost` with Windows authentication. To use another server or SQL authentication, set `FAS_TEST_SQLSERVER` to a connection string **without** a database name:
+
+```bash
+# PowerShell: $env:FAS_TEST_SQLSERVER = "Server=localhost;User Id=sa;Password=<password>;TrustServerCertificate=True"
+export FAS_TEST_SQLSERVER="Server=localhost;User Id=sa;Password=<password>;TrustServerCertificate=True"
+```
+
+The login needs permission to create and drop databases. From the repository root:
 
 ```bash
 dotnet test
 ```
+
+The full suite takes about a minute and a half, mostly creating databases.
 
 Run one class or test by name:
 
@@ -19,9 +28,9 @@ dotnet test --filter "FullyQualifiedName~BuildingFileServiceTests"
 
 ## Data isolation
 
-- Every test class creates its own temporary folder (`TestSupport/TempDirectory.cs`) and deletes it afterwards. Tests never read or write the app's real `App_Data` folder or database.
-- Service tests build the real EF Core repositories, Identity stores, and services over a SQLite file in that folder (`TestSupport/ServiceHarness.cs`). The schema is created by the app's real migrations, so the tests also check that the migrations work. Creating a second harness on the same folder simulates an app restart. Connections use `Pooling=False` so the folder can always be deleted.
-- Integration tests host the real app in memory with `WebApplicationFactory` (`TestSupport/AppFactory.cs`). They point the connection string and `Storage:UploadsDirectory` at a temp folder, set a 1 KB upload limit, and fix the clock to **Nov 3, 2026** so date-based pages are predictable.
+- Every test class creates its own temporary folder (`TestSupport/TempDirectory.cs`) and deletes it afterwards. If the test used a database (`FasTest_<folder id>`, see `TestSupport/TestDatabase.cs`), that is dropped too. Tests never read or write the app's real `App_Data` folder or `FireAlarmScheduler` database. File-only tests don't connect to SQL Server at all.
+- Service tests build the real EF Core repositories, Identity stores, and services over the test database (`TestSupport/ServiceHarness.cs`). The schema is created by the app's real migrations, so the tests also check that the migrations work. Creating a second harness on the same folder simulates an app restart. Connections use `Pooling=False` so nothing keeps the database open when it is dropped.
+- Integration tests host the real app in memory with `WebApplicationFactory` (`TestSupport/AppFactory.cs`). They point the connection string at the test database and `Storage:UploadsDirectory` at the temp folder, set a 1 KB upload limit, and fix the clock to **Nov 3, 2026** so date-based pages are predictable.
 - `AppFactory.CreateUserAsync` adds an account with a role directly; `SignInAsync` / `SignInAsNewUserAsync` sign in through the real login form and return a client holding the auth cookie. All test accounts use `AppFactory.TestPassword`.
 - `TestSupport/FormPoster.cs` submits forms like a browser does, by reading the page's antiforgery token first.
 
@@ -45,5 +54,5 @@ dotnet test --filter "FullyQualifiedName~BuildingFileServiceTests"
 ## Gaps and manual checks
 
 - Views are checked through HTML content, not visual layout. After UI changes, run the app and check pages at desktop and phone widths.
-- Tests run against SQLite only. If the provider is switched to SQL Server, regenerate the migrations and rerun the suite against it.
+- If a test run is killed midway, leftover `FasTest_*` databases can be dropped by hand.
 - The ~1-minute delay before role changes reach an already signed-in session (security-stamp validation interval) isn't tested; tests sign in again after changes.

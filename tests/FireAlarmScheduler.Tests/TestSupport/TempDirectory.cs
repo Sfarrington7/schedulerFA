@@ -1,5 +1,5 @@
-// Purpose: Creates a unique temporary folder for one test and deletes it afterwards,
-// so tests never touch real App_Data and never depend on each other.
+// Purpose: Creates a unique temporary folder (and the name of a matching throwaway test database) for one
+// test and deletes both afterwards, so tests never touch real data and never depend on each other.
 namespace FireAlarmScheduler.Tests.TestSupport;
 
 public sealed class TempDirectory : IDisposable
@@ -14,8 +14,11 @@ public sealed class TempDirectory : IDisposable
 
     public string Combine(params string[] parts) => System.IO.Path.Combine([Path, .. parts]);
 
+    public string DatabaseName => TestDatabase.NameFor(Path);
+
     public void Dispose()
     {
+        TestDatabase.DropIfUsed(DatabaseName);
         if (Directory.Exists(Path))
         {
             Directory.Delete(Path, recursive: true);

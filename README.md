@@ -36,7 +36,7 @@ Self-service registration, password-reset emails, two-factor sign-in, multi-comp
 | Framework | ASP.NET Core / .NET 10 |
 | Language | C# |
 | UI | ASP.NET Core MVC with Razor views (no code-behind) |
-| Data persistence | EF Core 10 with SQLite (`App_Data/scheduler.db`), schema managed by migrations |
+| Data persistence | EF Core 10 with SQL Server on `localhost` (database `FireAlarmScheduler`), schema managed by migrations |
 | Accounts and roles | ASP.NET Core Identity (MVC screens, no Razor Pages UI) |
 | Uploaded documents | Local filesystem, outside `wwwroot` |
 | Testing | xUnit (`dotnet test`) |
@@ -89,10 +89,10 @@ schedulerFA/
 
 | What | Default location |
 | --- | --- |
-| All records (technicians, jobs, assignments, buildings, file metadata, users, roles) | SQLite database `src/FireAlarmScheduler/App_Data/scheduler.db` (`ConnectionStrings:DefaultConnection`) |
+| All records (technicians, jobs, assignments, buildings, file metadata, users, roles) | SQL Server database `FireAlarmScheduler` on `localhost` (`ConnectionStrings:DefaultConnection`) |
 | Uploaded spreadsheets | `src/FireAlarmScheduler/App_Data/uploads/` (stored as `<random id>.<ext>`; `Storage:UploadsDirectory`) |
 
-Relative paths resolve against the project folder. `App_Data` is outside `wwwroot`, so uploads are only reachable through the app's download links, and it is ignored by Git. On startup the app applies any pending EF Core migrations and creates the four roles if they are missing. To reset the app, stop it and delete `App_Data`.
+The upload path resolves against the project folder. `App_Data` is outside `wwwroot`, so uploads are only reachable through the app's download links, and it is ignored by Git. On startup the app creates the database if needed, applies any pending EF Core migrations, and creates the four roles if they are missing. To reset the app, stop it, drop the `FireAlarmScheduler` database, and delete `App_Data/uploads`.
 
 Tables: `Technicians`, `Jobs`, `JobAssignments` (job ↔ technician), `Buildings`, `UploadedFiles`, plus the Identity tables (`AspNetUsers`, `AspNetRoles`, `AspNetUserRoles`, …). Deleting a job cascades to its assignments, buildings, and file records; deleting a technician removes their assignments and unlinks their account.
 
@@ -106,11 +106,28 @@ After changing an entity or `Data/AppDbContext.cs`, add a migration (one-time to
 dotnet ef migrations add <Name> --project src/FireAlarmScheduler --output-dir Data/Migrations
 ```
 
-The app applies it at the next start. To move to SQL Server, replace the `Microsoft.EntityFrameworkCore.Sqlite` package with `Microsoft.EntityFrameworkCore.SqlServer`, change `UseSqlite` to `UseSqlServer` in `Program.cs`, set the connection string, and regenerate the migrations (they are provider-specific).
+The app applies it at the next start.
 
 ## Getting started
 
-Prerequisite: the **.NET 10 SDK** (`winget install Microsoft.DotNet.SDK.10` on Windows). Check it with `dotnet --version`.
+Prerequisites:
+
+- The **.NET 10 SDK** (`winget install Microsoft.DotNet.SDK.10` on Windows). Check it with `dotnet --version`.
+- **SQL Server running on `localhost`** (default instance, port 1433), for example SQL Server 2022 Developer or Express. The login you run the app as needs permission to create a database.
+
+The default connection string uses Windows authentication:
+
+```text
+Server=localhost;Database=FireAlarmScheduler;Trusted_Connection=True;TrustServerCertificate=True
+```
+
+To use a named instance (for example `localhost\SQLEXPRESS`) or SQL authentication, override it with user secrets rather than editing `appsettings.json`, so no password is committed:
+
+```bash
+dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Server=localhost;Database=FireAlarmScheduler;User Id=<user>;Password=<password>;TrustServerCertificate=True" --project src/FireAlarmScheduler
+```
+
+`TrustServerCertificate=True` accepts the self-signed certificate a local SQL Server uses; don't use it for a remote server.
 
 From the repository root:
 
@@ -165,12 +182,12 @@ Key expectations:
 4. Add buildings and secure file upload/download functionality with tests.
 5. Build technician day/week schedule and mobile-friendly views.
 6. Test the complete primary workflow and fix usability issues.
-7. Replace JSON storage with EF Core/SQLite and add Identity sign-in, four roles, and user/role management.
+7. Replace JSON storage with EF Core (now SQL Server on localhost) and add Identity sign-in, four roles, and user/role management.
 
 ## Progress and decisions
 
 - **Current milestone:** Steps 1–7 complete. Next: usability fixes from real use.
-- **Decision:** Store all records in SQL tables through EF Core. SQLite is the default because it needs no server and runs on Windows, macOS, Linux, and in tests; SQL Server is a provider swap (see *Changing the database schema*).
+- **Decision:** Store all records in SQL Server tables through EF Core, using a local SQL Server (`localhost`) for development. Tests use throwaway databases on a SQL Server too, so they run against the same provider and migrations as the app.
 - **Decision:** Use ASP.NET Core Identity with four fixed roles (SuperAdmin, Admin, TeamLead, Technician), seeded at startup. Roles are not created or deleted in the UI. Identity screens are hand-written MVC controllers and views, because the stock Identity UI is built on Razor Pages.
 - **Decision:** Admins manage only TeamLead and Technician accounts; only SuperAdmins can grant or change Admin/SuperAdmin. The last active SuperAdmin can't be demoted, locked, or deleted, and no one can delete or lock their own account.
 - **Decision:** The first SuperAdmin is created through a setup page that only works while the database has no accounts, so no default password is committed to the repository.
@@ -181,7 +198,6 @@ Key expectations:
 - **Decision:** Building names must be unique within a job. Deleting a technician unassigns them from all jobs. Deleting a job or building deletes its files.
 - **Decision:** Team leads and administrators can pick any technician in the Technician View (the choice is remembered in a cookie); technician accounts always see their own.
 - **Limitation:** Two people editing the same job at the same moment: the last save wins (no optimistic-concurrency check). Building-name uniqueness is checked in code, not by a database constraint.
-- **Limitation:** SQLite suits one app server. Use SQL Server (or similar) for shared hosting.
 - **Open before real deployment:** HTTPS-only hosting, production database and backups, email confirmation and password-reset emails, audit logging, and customer-data protections.
 
 Keep this section current as changes are implemented.
