@@ -27,9 +27,16 @@ public class JobService
         Sort((await _jobs.GetAllAsync()).Where(j => j.OverlapsRange(from, to)));
 
     /// <summary>Returns the technician's assigned jobs that run on at least one day in the range.</summary>
-    public async Task<List<Job>> GetJobsForTechnicianAsync(Guid technicianId, DateOnly from, DateOnly to) =>
+    public Task<List<Job>> GetJobsForTechnicianAsync(Guid technicianId, DateOnly from, DateOnly to) =>
+        GetJobsForTechniciansAsync([technicianId], from, to);
+
+    /// <summary>
+    /// Returns jobs in the range assigned to at least one of <paramref name="technicianIds"/>, each job once.
+    /// An empty set of technicians returns no jobs.
+    /// </summary>
+    public async Task<List<Job>> GetJobsForTechniciansAsync(IReadOnlyCollection<Guid> technicianIds, DateOnly from, DateOnly to) =>
         Sort((await _jobs.GetAllAsync())
-            .Where(j => j.AssignedTechnicianIds.Contains(technicianId) && j.OverlapsRange(from, to)));
+            .Where(j => j.OverlapsRange(from, to) && j.AssignedTechnicianIds.Any(technicianIds.Contains)));
 
     public async Task<Job> CreateAsync(JobInput input)
     {

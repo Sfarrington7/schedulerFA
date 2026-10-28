@@ -85,3 +85,116 @@ body {
 .app-navbar .nav-link {
   white-space: nowrap;
 }
+
+/* Month calendar: fixed-width day columns; names shrink to dots on phones so a whole month fits. */
+.month-calendar {
+  table-layout: fixed;
+  min-width: 18rem;
+}
+
+.month-calendar th {
+  text-align: center;
+  font-size: .8rem;
+}
+
+.month-calendar td {
+  height: 6.5rem;
+  padding: .25rem;
+  vertical-align: top;
+  overflow: hidden;
+}
+
+.month-calendar td.other-month {
+  background-color: #f8f9fa;
+  color: #adb5bd;
+}
+
+.month-calendar td.today {
+  background-color: #fff6e5;
+}
+
+.month-calendar .day-number {
+  display: block;
+  font-size: .8rem;
+  font-weight: 600;
+  color: inherit;
+  text-decoration: none;
+}
+
+.calendar-entry {
+  display: block;
+  margin-bottom: .2rem;
+  padding: .1rem .25rem;
+  font-size: .75rem;
+  line-height: 1.3;
+  border-radius: .25rem;
+  background-color: #e9ecef;
+  color: inherit;
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.calendar-entry:hover {
+  background-color: #dee2e6;
+}
+
+.calendar-dot {
+  display: none;
+  width: .5rem;
+  height: .5rem;
+  border-radius: 50%;
+  background-color: var(--app-accent);
+}
+
+@media (max-width: 767.98px) {
+  .month-calendar td {
+    height: 4rem;
+  }
+
+  .calendar-entry {
+    padding: 0;
+    background: none;
+  }
+
+  .calendar-entry-name {
+    display: none;
+  }
+
+  .calendar-dot {
+    display: inline-block;
+  }
+
+  .calendar-entry .tech-tag {
+    font-size: .6rem;
+  }
+}
+
+/* Technician colors: each technician keeps one color across the calendar and the picker. */
+.tech-tag {
+  display: inline-block;
+  min-width: 1.6em;
+  padding: 0 .25em;
+  font-size: .7rem;
+  font-weight: 600;
+  line-height: 1.5;
+  text-align: center;
+  border-radius: .25rem;
+  color: #fff;
+}
+
+.tech-color-0 { background-color: #1f6feb; }
+.tech-color-1 { background-color: #b3261e; }
+.tech-color-2 { background-color: #1a7f37; }
+.tech-color-3 { background-color: #8250df; }
+.tech-color-4 { background-color: #bc4c00; }
+.tech-color-5 { background-color: #0a7d8c; }
+.tech-color-6 { background-color: #bf3989; }
+.tech-color-7 { background-color: #57606a; }
+
+/* Technician week list: every day is shown; today is highlighted. */
+.schedule-day.is-today {
+  padding-left: .5rem;
+  border-left: 3px solid var(--app-accent);
+}

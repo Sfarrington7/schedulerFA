@@ -1,0 +1,50 @@
+@* Monday–Sunday month grid used by the team lead and technician month views. Each day lists its jobs,
+   tagged with the shown technicians' colored initials; on phones job names collapse to colored dots. *@
+@model MonthCalendarViewModel
+<div class="table-responsive">
+    <table class="table table-bordered month-calendar mb-0" aria-label="@Model.Title">
+        <thead>
+            <tr>
+                @foreach (var day in Model.Weeks[0])
+                {
+                    <th scope="col"><span class="d-none d-md-inline">@day.Date.ToString("ddd")</span><span class="d-md-none">@day.Date.ToString("ddd")[0]</span></th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var week in Model.Weeks)
+            {
+                <tr>
+                    @foreach (var day in week)
+                    {
+                        <td class="@(day.InMonth ? "" : "other-month") @(day.IsToday ? "today" : "")">
+                            @if (day.DayUrl is not null)
+                            {
+                                <a class="day-number" href="@day.DayUrl" aria-label="@day.Date.ToString("dddd, MMMM d")">@day.Date.Day</a>
+                            }
+                            else
+                            {
+                                <span class="day-number">@day.Date.Day</span>
+                            }
+                            @foreach (var entry in day.Entries)
+                            {
+                                <a class="calendar-entry" href="@entry.Url" title="@entry.Job.Name · @entry.Job.TimeRangeText · @entry.Job.TechnicianNamesText">
+                                    @* Tags come first so a long job name is what gets cut off, not the technicians. *@
+                                    @foreach (var tech in entry.Technicians)
+                                    {
+                                        <span class="tech-tag tech-color-@tech.ColorIndex" title="@tech.FullName">@tech.Initials</span>
+                                    }
+                                    @if (entry.Technicians.Count == 0)
+                                    {
+                                        <span class="calendar-dot" aria-hidden="true"></span>
+                                    }
+                                    <span class="calendar-entry-name">@entry.Job.Name</span>
+                                </a>
+                            }
+                        </td>
+                    }
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>

@@ -85,6 +85,9 @@ public class JobSummaryViewModel
 
     public string TimeRangeText => $"{StartTime:h:mm tt} – {EndTime:h:mm tt}";
 
+    /// <summary>True when the job runs on any day from <paramref name="from"/> to <paramref name="to"/> inclusive.</summary>
+    public bool OverlapsRange(DateOnly from, DateOnly to) => StartDate <= to && EndDate >= from;
+
     public string TechnicianNamesText => Technicians.Count == 0 ? "Unassigned" : string.Join(", ", Technicians.Select(t => t.FullName));
 
     /// <summary>Builds a summary, looking up assigned technician names; unknown ids are skipped.</summary>

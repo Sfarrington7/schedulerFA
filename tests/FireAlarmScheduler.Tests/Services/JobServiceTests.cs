@@ -210,4 +210,30 @@ public class JobServiceTests : IDisposable
 
         Assert.Equal(["Morning", "Afternoon", "Later"], jobs.Select(j => j.Name));
     }
+
+    [Fact]
+    public async Task GetJobsForTechniciansAsync_SeveralTechnicians_ReturnsEachMatchingJobOnce()
+    {
+        var john = await _harness.TechnicianService.AddAsync("John", "Smith");
+        var mike = await _harness.TechnicianService.AddAsync("Mike", "Johnson");
+        var sara = await _harness.TechnicianService.AddAsync("Sara", "Lee");
+        await Jobs.CreateAsync(ServiceHarness.ValidJob(john.Id, mike.Id) with { Name = "Shared job" });
+        await Jobs.CreateAsync(ServiceHarness.ValidJob(mike.Id) with { Name = "Mike's job" });
+        await Jobs.CreateAsync(ServiceHarness.ValidJob(sara.Id) with { Name = "Sara's job" });
+        await Jobs.CreateAsync(ServiceHarness.ValidJob(john.Id) with { Name = "Next month", StartDate = new DateOnly(2026, 12, 7), EndDate = new DateOnly(2026, 12, 8) });
+
+        var jobs = await Jobs.GetJobsForTechniciansAsync([john.Id, mike.Id], new DateOnly(2026, 11, 1), new DateOnly(2026, 11, 30));
+
+        Assert.Equal(["Mike's job", "Shared job"], jobs.Select(j => j.Name).Order());
+    }
+
+    [Fact]
+    public async Task GetJobsForTechniciansAsync_NoTechnicians_ReturnsNothing()
+    {
+        var john = await _harness.TechnicianService.AddAsync("John", "Smith");
+        await Jobs.CreateAsync(ServiceHarness.ValidJob(john.Id));
+        await Jobs.CreateAsync(ServiceHarness.ValidJob() with { Name = "Unassigned" });
+
+        Assert.Empty(await Jobs.GetJobsForTechniciansAsync([], new DateOnly(2026, 11, 1), new DateOnly(2026, 11, 30)));
+    }
 }
