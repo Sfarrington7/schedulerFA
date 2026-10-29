@@ -59,15 +59,15 @@ public class JobFormModel
     /// <summary>On edit: the name of the recurring job this job belongs to, if any; filled by the controller.</summary>
     public string? LinkedRecurringJobName { get; set; }
 
-    /// <summary>On create from a recurring job: the job whose buildings will be copied, and those buildings' names.</summary>
-    public string? BuildingsSourceText { get; set; }
-    public List<string> BuildingsToCopy { get; set; } = [];
+    /// <summary>On create: the job's buildings. Starts with the recurring job's building list when one is chosen.</summary>
+    public List<BuildingRowModel> Buildings { get; set; } = [];
 
     public bool IsNew => Id is null;
 
     public JobInput ToInput() => new(Name, CustomerName, SiteName, Address, StartDate, EndDate,
         StartTime, EndTime, Status, Notes, AssignedTechnicianIds,
-        IsNew ? RecurringJobId : null, SaveAsRecurring && (!IsNew || RecurringJobId is null));
+        IsNew ? RecurringJobId : null, SaveAsRecurring && (!IsNew || RecurringJobId is null),
+        IsNew ? Buildings.Select(b => new BuildingInput(b.Name, b.Notes)).ToList() : null);
 
     public static JobFormModel FromEntity(Job job) => new()
     {
@@ -86,12 +86,34 @@ public class JobFormModel
     };
 }
 
+/// <summary>One building row on the Create Job form; rows left blank are ignored.</summary>
+public class BuildingRowModel
+{
+    [StringLength(100)]
+    public string? Name { get; set; }
+
+    [StringLength(2000)]
+    public string? Notes { get; set; }
+}
+
 /// <summary>A recurring job in the Create Job picker.</summary>
 public record RecurringJobOption(Guid Id, string Name, string Detail);
 
 /// <summary>A row on the Recurring jobs page.</summary>
 public record RecurringJobListItemViewModel(Guid Id, string Name, string? CustomerName, string? SiteName, string Address,
-    int JobCount, DateOnly? LatestStartDate);
+    int JobCount, DateOnly? LatestStartDate, List<string> BuildingNames);
+
+/// <summary>A recurring job's page: its details and the standing building list future jobs start with.</summary>
+public class RecurringJobDetailsViewModel
+{
+    public Guid Id { get; init; }
+    public string Name { get; init; } = "";
+    public string? CustomerName { get; init; }
+    public string? SiteName { get; init; }
+    public string Address { get; init; } = "";
+    public List<BuildingViewModel> Buildings { get; init; } = [];
+    public BuildingFormModel NewBuilding { get; init; } = new();
+}
 
 public class JobSummaryViewModel
 {

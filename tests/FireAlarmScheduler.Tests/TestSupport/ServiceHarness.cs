@@ -49,7 +49,7 @@ public sealed class ServiceHarness
 
         TechnicianService = new TechnicianService(Technicians);
         RecurringJobService = new RecurringJobService(RecurringJobRepository, Jobs);
-        JobService = new JobService(Jobs, Technicians, FileStorage, RecurringJobService);
+        JobService = new JobService(Jobs, Technicians, FileStorage, RecurringJobService, new FixedTimeProvider(Now));
         PtoService = new PtoService(PtoRequests, Technicians, new FixedTimeProvider(Now));
         ConflictService = new ScheduleConflictService(Jobs, PtoRequests);
         FileService = new BuildingFileService(Jobs, FileStorage,

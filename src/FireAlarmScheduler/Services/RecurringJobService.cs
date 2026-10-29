@@ -1,5 +1,5 @@
-// Purpose: Recurring job rules: list, save, and remove recurring jobs; find the building list a new job in the
-// series should start with; and keep a recurring job's details matching the newest job in its series.
+// Purpose: Recurring job rules: list, save, and remove recurring jobs; keep each one's details matching the newest
+// job in its series; and maintain its standing building list, which every new job in the series starts with.
 using FireAlarmScheduler.Entities;
 
 namespace FireAlarmScheduler.Services;
@@ -34,23 +34,20 @@ public class RecurringJobService
 
     public Task<RecurringJob?> GetAsync(Guid id) => _recurringJobs.GetByIdAsync(id);
 
-    /// <summary>Removes a recurring job. Its jobs and their buildings stay; they are just no longer linked.</summary>
+    /// <summary>Removes a recurring job and its building list. Its jobs and their buildings stay; they are just unlinked.</summary>
     public Task<bool> DeleteAsync(Guid id) => _recurringJobs.DeleteAsync(id);
 
-    /// <summary>
-    /// The newest job in the series (by start date), whose buildings a new job copies, or null if the series has no jobs.
-    /// <paramref name="exceptJobId"/> leaves one job out, such as the job being created.
-    /// </summary>
-    public async Task<Job?> GetLatestJobAsync(Guid recurringJobId, Guid? exceptJobId = null) =>
+    /// <summary>The newest job in the series (by start date and time), or null if the series has no jobs.</summary>
+    public async Task<Job?> GetLatestJobAsync(Guid recurringJobId) =>
         (await _jobs.GetAllAsync())
-            .Where(j => j.RecurringJobId == recurringJobId && j.Id != exceptJobId)
+            .Where(j => j.RecurringJobId == recurringJobId)
             .OrderByDescending(j => j.StartDate)
             .ThenByDescending(j => j.StartTime)
             .FirstOrDefault();
 
     /// <summary>
-    /// Saves a new recurring job from a job's details. Throws ValidationFailedException if another recurring
-    /// job already has the same name, so the list of recurring jobs stays unambiguous.
+    /// Saves a new recurring job from a job's details and buildings. Throws ValidationFailedException if another
+    /// recurring job already has the same name, so the list of recurring jobs stays unambiguous.
     /// </summary>
     public async Task<RecurringJob> CreateFromAsync(Job job)
     {
@@ -62,6 +59,11 @@ public class RecurringJobService
 
         var recurringJob = new RecurringJob { Id = Guid.NewGuid() };
         CopyDetails(job, recurringJob);
+        foreach (var building in job.Buildings.OrderBy(b => b.SortOrder))
+        {
+            recurringJob.AddBuildingIfMissing(building.Name, building.Notes);
+        }
+
         await _recurringJobs.AddAsync(recurringJob);
         return recurringJob;
     }
@@ -70,18 +72,54 @@ public class RecurringJobService
     /// Copies the job's name, customer, site, and address onto its recurring job, but only when this job is the
     /// newest in the series, so editing an older job never overwrites newer details.
     /// </summary>
-    public async Task SyncFromJobAsync(Job job)
+    public async Task SyncDetailsFromJobAsync(Job job)
     {
-        if (job.RecurringJobId is not { } recurringJobId
-            || (await GetLatestJobAsync(recurringJobId))?.Id != job.Id
-            || await _recurringJobs.GetByIdAsync(recurringJobId) is not { } recurringJob)
+        if (job.RecurringJobId is not { } recurringJobId || (await GetLatestJobAsync(recurringJobId))?.Id != job.Id)
         {
             return;
         }
 
-        CopyDetails(job, recurringJob);
-        await _recurringJobs.UpdateAsync(recurringJob);
+        await _recurringJobs.UpdateAsync(recurringJobId, recurringJob =>
+        {
+            CopyDetails(job, recurringJob);
+            return true;
+        });
     }
+
+    /// <summary>Adds buildings to the standing list, skipping names already on it. Returns false if the recurring job doesn't exist.</summary>
+    public async Task<bool> AddBuildingsAsync(Guid recurringJobId, IEnumerable<(string Name, string? Notes)> buildings) =>
+        await _recurringJobs.UpdateAsync(recurringJobId, recurringJob =>
+        {
+            foreach (var (name, notes) in buildings)
+            {
+                recurringJob.AddBuildingIfMissing(name, notes);
+            }
+
+            return true;
+        });
+
+    /// <summary>
+    /// Renames the standing-list building called <paramref name="oldName"/> and updates its notes. Does nothing if
+    /// that building isn't on the list or another building already has <paramref name="newName"/>.
+    /// </summary>
+    public Task RenameBuildingAsync(Guid recurringJobId, string oldName, string newName, string? notes) =>
+        _recurringJobs.UpdateAsync(recurringJobId, recurringJob =>
+        {
+            var building = recurringJob.Buildings.FirstOrDefault(b => string.Equals(b.Name, oldName, StringComparison.OrdinalIgnoreCase));
+            var taken = recurringJob.Buildings.Any(b => b != building && string.Equals(b.Name, newName, StringComparison.OrdinalIgnoreCase));
+            if (building is not null && !taken)
+            {
+                building.Name = newName;
+                building.Notes = notes;
+            }
+
+            return true;
+        });
+
+    /// <summary>Takes a building off the standing list so future jobs no longer start with it. Existing jobs keep theirs.</summary>
+    public async Task<bool> RemoveBuildingAsync(Guid recurringJobId, Guid buildingId) =>
+        await _recurringJobs.UpdateAsync(recurringJobId, recurringJob =>
+            recurringJob.Buildings.RemoveAll(b => b.Id == buildingId) > 0);
 
     private static void CopyDetails(Job job, RecurringJob recurringJob)
     {

@@ -1,0 +1,82 @@
+@* A recurring job's page: its saved details and the standing building list every new job in the series starts
+   with. Adding a building here also adds it to the series' upcoming jobs; removing one only affects future jobs. *@
+@model RecurringJobDetailsViewModel
+@{
+    ViewData["Title"] = Model.Name;
+}
+
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a asp-controller="Jobs" asp-action="Index">Jobs</a></li>
+        <li class="breadcrumb-item"><a asp-action="Index">Recurring jobs</a></li>
+        <li class="breadcrumb-item active" aria-current="page">@Model.Name</li>
+    </ol>
+</nav>
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h1 class="h3 mb-0">@Model.Name <span class="badge text-bg-info fs-6 align-middle">Recurring</span></h1>
+    <a class="btn btn-primary" asp-controller="Jobs" asp-action="Create" asp-route-recurringJobId="@Model.Id">Create this round's job</a>
+</div>
+
+<div class="card card-body mb-3">
+    <dl class="row mb-0">
+        @if (Model.CustomerName is not null)
+        {
+            <dt class="col-sm-3">Customer</dt>
+            <dd class="col-sm-9">@Model.CustomerName</dd>
+        }
+        @if (Model.SiteName is not null)
+        {
+            <dt class="col-sm-3">Site</dt>
+            <dd class="col-sm-9">@Model.SiteName</dd>
+        }
+        <dt class="col-sm-3">Address</dt>
+        <dd class="col-sm-9">@Model.Address</dd>
+    </dl>
+    <div class="form-text">These details follow the newest job in the series; edit that job to change them.</div>
+</div>
+
+<div class="card">
+    <div class="card-header fw-semibold">Buildings for future jobs</div>
+    @if (Model.Buildings.Count == 0)
+    {
+        <div class="card-body text-body-secondary">No buildings yet. Buildings added to any job in this series are saved here too.</div>
+    }
+    else
+    {
+        <ul class="list-group list-group-flush">
+            @foreach (var building in Model.Buildings)
+            {
+                <li class="list-group-item d-flex justify-content-between align-items-center gap-2">
+                    <span>
+                        <strong>@building.Name</strong>
+                        @if (building.Notes is not null)
+                        {
+                            <span class="small text-body-secondary d-block">@building.Notes</span>
+                        }
+                    </span>
+                    <form asp-action="RemoveBuilding" asp-route-id="@Model.Id" asp-route-buildingId="@building.Id" method="post"
+                          onsubmit="return confirm('Stop including this building in future jobs? Existing jobs keep it.');">
+                        <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
+                    </form>
+                </li>
+            }
+        </ul>
+    }
+    <div class="card-footer">
+        <form asp-action="AddBuilding" asp-route-id="@Model.Id" method="post" class="row g-2 align-items-end">
+            <div class="col-sm-4">
+                <label asp-for="NewBuilding.Name" class="form-label small mb-1"></label>
+                <input asp-for="NewBuilding.Name" class="form-control" placeholder="e.g. Building C" />
+            </div>
+            <div class="col-sm-6">
+                <label asp-for="NewBuilding.Notes" class="form-label small mb-1"></label>
+                <input asp-for="NewBuilding.Notes" class="form-control" />
+            </div>
+            <div class="col-sm-2 d-grid">
+                <button type="submit" class="btn btn-primary">Add building</button>
+            </div>
+        </form>
+        <div class="form-text">Adding a building here also adds it to this series' upcoming jobs.</div>
+    </div>
+</div>

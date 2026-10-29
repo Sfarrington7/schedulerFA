@@ -1,4 +1,4 @@
-// Purpose: Stores recurring jobs in the RecurringJobs SQL table via EF Core, one short-lived DbContext per call.
+// Purpose: Stores recurring jobs and their building lists in SQL tables via EF Core, one short-lived DbContext per call.
 using FireAlarmScheduler.Data;
 using FireAlarmScheduler.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -17,13 +17,13 @@ public class EfRecurringJobRepository : IRecurringJobRepository
     public async Task<List<RecurringJob>> GetAllAsync()
     {
         await using var db = await _contextFactory.CreateDbContextAsync();
-        return await db.RecurringJobs.AsNoTracking().ToListAsync();
+        return await WithBuildings(db.RecurringJobs).AsNoTracking().ToListAsync();
     }
 
     public async Task<RecurringJob?> GetByIdAsync(Guid id)
     {
         await using var db = await _contextFactory.CreateDbContextAsync();
-        return await db.RecurringJobs.AsNoTracking().FirstOrDefaultAsync(r => r.Id == id);
+        return await WithBuildings(db.RecurringJobs).AsNoTracking().FirstOrDefaultAsync(r => r.Id == id);
     }
 
     public async Task AddAsync(RecurringJob recurringJob)
@@ -33,23 +33,24 @@ public class EfRecurringJobRepository : IRecurringJobRepository
         await db.SaveChangesAsync();
     }
 
-    public async Task<bool> UpdateAsync(RecurringJob recurringJob)
+    public async Task<TResult?> UpdateAsync<TResult>(Guid id, Func<RecurringJob, TResult> change)
     {
         await using var db = await _contextFactory.CreateDbContextAsync();
-        if (!await db.RecurringJobs.AnyAsync(r => r.Id == recurringJob.Id))
+        var recurringJob = await WithBuildings(db.RecurringJobs).FirstOrDefaultAsync(r => r.Id == id);
+        if (recurringJob is null)
         {
-            return false;
+            return default;
         }
 
-        db.RecurringJobs.Update(recurringJob);
+        var result = change(recurringJob);
         await db.SaveChangesAsync();
-        return true;
+        return result;
     }
 
     public async Task<bool> DeleteAsync(Guid id)
     {
         await using var db = await _contextFactory.CreateDbContextAsync();
-        var recurringJob = await db.RecurringJobs.FirstOrDefaultAsync(r => r.Id == id);
+        var recurringJob = await WithBuildings(db.RecurringJobs).FirstOrDefaultAsync(r => r.Id == id);
         if (recurringJob is null)
         {
             return false;
@@ -59,4 +60,7 @@ public class EfRecurringJobRepository : IRecurringJobRepository
         await db.SaveChangesAsync();
         return true;
     }
+
+    private static IQueryable<RecurringJob> WithBuildings(IQueryable<RecurringJob> recurringJobs) =>
+        recurringJobs.Include(r => r.Buildings.OrderBy(b => b.SortOrder));
 }

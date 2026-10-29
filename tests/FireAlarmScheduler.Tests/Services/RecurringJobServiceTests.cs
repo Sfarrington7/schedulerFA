@@ -1,6 +1,8 @@
 // Purpose: Tests recurring jobs against the real database: saving a job as recurring, creating a job from one
-// (details linked, building list copied from the newest job in the series, files not copied), keeping the saved
-// details in step with the newest job, duplicate names, and removing a recurring job without losing its jobs.
+// (details linked, the series' building list used, files not copied), keeping saved details in step with the newest
+// job, the standing building list (buildings added to any job in a series reach the list and upcoming jobs; renames
+// follow; removals from one job don't), duplicate names, and removing a recurring job without losing its jobs.
+// The clock is fixed to Nov 3, 2026, so 2027 jobs are "upcoming".
 using FireAlarmScheduler.Entities;
 using FireAlarmScheduler.Services;
 using FireAlarmScheduler.Tests.TestSupport;
@@ -75,7 +77,7 @@ public class RecurringJobServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task CreateAsync_FromRecurringJob_CopiesFromNewestJobInSeries()
+    public async Task CreateAsync_FromRecurringJob_IncludesBuildingAddedToAnyEarlierJob()
     {
         var first = await CreateSeriesAsync();
         var second = await Jobs.CreateAsync(NextYear(first.RecurringJobId!.Value));
@@ -199,5 +201,168 @@ public class RecurringJobServiceTests : IDisposable
         var summary = Assert.Single(await Recurring.GetAllAsync());
         Assert.Equal(0, summary.JobCount);
         Assert.Null(summary.LatestStartDate);
+    }
+
+    [Fact]
+    public async Task CreateAsync_BuildingRows_SavedInOrderIgnoringBlankRows()
+    {
+        var job = await Jobs.CreateAsync(ServiceHarness.ValidJob() with
+        {
+            Buildings = [new("  Building A ", "Panel in lobby"), new("", "ignored"), new("Parking Garage", "  ")]
+        });
+
+        var reloaded = (await Jobs.GetAsync(job.Id))!;
+        Assert.Equal(["Building A", "Parking Garage"], reloaded.Buildings.Select(b => b.Name));
+        Assert.Equal("Panel in lobby", reloaded.Buildings[0].Notes);
+        Assert.Null(reloaded.Buildings[1].Notes);
+    }
+
+    [Fact]
+    public async Task CreateAsync_DuplicateBuildingRows_ThrowsAndSavesNothing()
+    {
+        var ex = await Assert.ThrowsAsync<ValidationFailedException>(() => Jobs.CreateAsync(ServiceHarness.ValidJob() with
+        {
+            SaveAsRecurring = true,
+            Buildings = [new("Building A", null), new("building a", null)]
+        }));
+
+        Assert.True(ex.Errors.ContainsKey("Buildings"));
+        Assert.Empty(await Jobs.GetAllAsync());
+        Assert.Empty(await Recurring.GetAllAsync());
+    }
+
+    [Fact]
+    public async Task CreateAsync_SaveAsRecurringWithBuildings_SavesThemAsTheSeriesList()
+    {
+        var job = await Jobs.CreateAsync(ServiceHarness.ValidJob() with
+        {
+            SaveAsRecurring = true,
+            Buildings = [new("Building A", "North entrance"), new("Building B", null)]
+        });
+
+        var recurring = (await Recurring.GetAsync(job.RecurringJobId!.Value))!;
+        Assert.Equal(["Building A", "Building B"], recurring.Buildings.Select(b => b.Name));
+        Assert.Equal("North entrance", recurring.Buildings[0].Notes);
+    }
+
+    [Fact]
+    public async Task CreateAsync_FromRecurringJobWithEditedRows_UsesRowsAndAddsOnlyNewBuildingsToSeries()
+    {
+        var first = await CreateSeriesAsync();
+
+        var second = await Jobs.CreateAsync(NextYear(first.RecurringJobId!.Value) with
+        {
+            Buildings = [new("Building A", null), new("Building C", "New this year")]
+        });
+
+        Assert.Equal(["Building A", "Building C"], second.Buildings.Select(b => b.Name));
+        var series = (await Recurring.GetAsync(first.RecurringJobId.Value))!;
+        Assert.Equal(["Building A", "Building B", "Parking Garage", "Building C"], series.Buildings.Select(b => b.Name));
+    }
+
+    [Fact]
+    public async Task AddBuildingAsync_JobInSeries_AddsToSeriesListAndUpcomingJobsOnly()
+    {
+        var current = await CreateSeriesAsync();
+        var upcoming = await Jobs.CreateAsync(NextYear(current.RecurringJobId!.Value));
+        var completedUpcoming = await Jobs.CreateAsync(NextYear(current.RecurringJobId.Value) with
+        {
+            StartDate = new DateOnly(2027, 12, 1), EndDate = new DateOnly(2027, 12, 1), Status = JobStatus.Completed
+        });
+        var oneOff = await Jobs.CreateAsync(ServiceHarness.ValidJob() with { Name = "One-off", StartDate = new DateOnly(2027, 1, 4), EndDate = new DateOnly(2027, 1, 4) });
+
+        await Jobs.AddBuildingAsync(current.Id, "Building C", "Added during this year's test");
+
+        Assert.Contains("Building C", (await Recurring.GetAsync(current.RecurringJobId.Value))!.Buildings.Select(b => b.Name));
+        var upcomingC = Assert.Single((await Jobs.GetAsync(upcoming.Id))!.Buildings, b => b.Name == "Building C");
+        Assert.Equal("Added during this year's test", upcomingC.Notes);
+        Assert.Equal(3, upcomingC.SortOrder);
+        Assert.DoesNotContain("Building C", (await Jobs.GetAsync(completedUpcoming.Id))!.Buildings.Select(b => b.Name));
+        Assert.Empty((await Jobs.GetAsync(oneOff.Id))!.Buildings);
+    }
+
+    [Fact]
+    public async Task AddBuildingAsync_UpcomingJobAlreadyHasIt_NoDuplicate()
+    {
+        var current = await CreateSeriesAsync();
+        var upcoming = await Jobs.CreateAsync(NextYear(current.RecurringJobId!.Value) with
+        {
+            Buildings = [new("Building A", null), new("building c", null)]
+        });
+
+        await Jobs.AddBuildingAsync(current.Id, "Building C", null);
+
+        Assert.Single((await Jobs.GetAsync(upcoming.Id))!.Buildings, b => b.Name.Equals("Building C", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task AddBuildingAsync_PastJobInSeries_NotChangedWhenUpcomingJobAddsBuilding()
+    {
+        var current = await CreateSeriesAsync();
+        var upcoming = await Jobs.CreateAsync(NextYear(current.RecurringJobId!.Value));
+
+        await Jobs.AddBuildingAsync(upcoming.Id, "Building C", null);
+
+        Assert.Equal(3, (await Jobs.GetAsync(current.Id))!.Buildings.Count);
+        Assert.Contains("Building C", (await Recurring.GetAsync(current.RecurringJobId.Value))!.Buildings.Select(b => b.Name));
+    }
+
+    [Fact]
+    public async Task UpdateBuildingAsync_JobInSeries_RenamesOnSeriesList()
+    {
+        var current = await CreateSeriesAsync();
+        var buildingB = current.Buildings.Single(b => b.Name == "Building B");
+
+        await Jobs.UpdateBuildingAsync(current.Id, buildingB.Id, "Building B (East)", "Roof hatch");
+
+        var series = (await Recurring.GetAsync(current.RecurringJobId!.Value))!;
+        Assert.Equal(["Building A", "Building B (East)", "Parking Garage"], series.Buildings.Select(b => b.Name));
+        Assert.Equal("Roof hatch", series.Buildings[1].Notes);
+    }
+
+    [Fact]
+    public async Task DeleteBuildingAsync_JobInSeries_KeepsBuildingOnSeriesList()
+    {
+        var current = await CreateSeriesAsync();
+
+        await Jobs.DeleteBuildingAsync(current.Id, current.Buildings.Single(b => b.Name == "Parking Garage").Id);
+
+        Assert.Equal(3, (await Recurring.GetAsync(current.RecurringJobId!.Value))!.Buildings.Count);
+    }
+
+    [Fact]
+    public async Task AddRecurringBuildingAsync_AddsToSeriesAndUpcomingJobs()
+    {
+        var current = await CreateSeriesAsync();
+        var upcoming = await Jobs.CreateAsync(NextYear(current.RecurringJobId!.Value));
+
+        Assert.True(await Jobs.AddRecurringBuildingAsync(current.RecurringJobId.Value, " Pump House ", null));
+
+        Assert.Contains("Pump House", (await Recurring.GetAsync(current.RecurringJobId.Value))!.Buildings.Select(b => b.Name));
+        Assert.Contains("Pump House", (await Jobs.GetAsync(upcoming.Id))!.Buildings.Select(b => b.Name));
+        Assert.DoesNotContain("Pump House", (await Jobs.GetAsync(current.Id))!.Buildings.Select(b => b.Name));
+    }
+
+    [Fact]
+    public async Task AddRecurringBuildingAsync_BlankNameOrUnknownRecurringJob_Rejected()
+    {
+        var current = await CreateSeriesAsync();
+
+        await Assert.ThrowsAsync<ValidationFailedException>(() => Jobs.AddRecurringBuildingAsync(current.RecurringJobId!.Value, " ", null));
+        Assert.False(await Jobs.AddRecurringBuildingAsync(Guid.NewGuid(), "Pump House", null));
+    }
+
+    [Fact]
+    public async Task RemoveBuildingAsync_TakesItOffSeriesListOnly()
+    {
+        var current = await CreateSeriesAsync();
+        var series = (await Recurring.GetAsync(current.RecurringJobId!.Value))!;
+
+        Assert.True(await Recurring.RemoveBuildingAsync(series.Id, series.Buildings.Single(b => b.Name == "Building B").Id));
+
+        Assert.Equal(["Building A", "Parking Garage"], (await Recurring.GetAsync(series.Id))!.Buildings.Select(b => b.Name));
+        Assert.Equal(3, (await Jobs.GetAsync(current.Id))!.Buildings.Count);
+        var next = await Jobs.CreateAsync(NextYear(series.Id));
+        Assert.Equal(["Building A", "Parking Garage"], next.Buildings.Select(b => b.Name));
     }
 }

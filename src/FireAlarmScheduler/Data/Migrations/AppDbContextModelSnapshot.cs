@@ -271,6 +271,33 @@ namespace FireAlarmScheduler.Data.Migrations
                     b.ToTable("RecurringJobs");
                 });
 
+            modelBuilder.Entity("FireAlarmScheduler.Entities.RecurringJobBuilding", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<Guid>("RecurringJobId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RecurringJobId");
+
+                    b.ToTable("RecurringJobBuildings");
+                });
+
             modelBuilder.Entity("FireAlarmScheduler.Entities.Technician", b =>
                 {
                     b.Property<Guid>("Id")
@@ -507,6 +534,15 @@ namespace FireAlarmScheduler.Data.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("FireAlarmScheduler.Entities.RecurringJobBuilding", b =>
+                {
+                    b.HasOne("FireAlarmScheduler.Entities.RecurringJob", null)
+                        .WithMany("Buildings")
+                        .HasForeignKey("RecurringJobId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("FireAlarmScheduler.Entities.UploadedFile", b =>
                 {
                     b.HasOne("FireAlarmScheduler.Entities.Building", null)
@@ -576,6 +612,11 @@ namespace FireAlarmScheduler.Data.Migrations
                 {
                     b.Navigation("Assignments");
 
+                    b.Navigation("Buildings");
+                });
+
+            modelBuilder.Entity("FireAlarmScheduler.Entities.RecurringJob", b =>
+                {
                     b.Navigation("Buildings");
                 });
 #pragma warning restore 612, 618

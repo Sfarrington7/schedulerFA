@@ -1,5 +1,5 @@
-@* Shared create/edit form for a job: recurring-job choice, details, schedule, status, notes, and technician
-   assignment. On create, picking a recurring job reloads the form with its saved details and building preview. *@
+@* Shared create/edit form for a job: recurring-job choice, details, buildings (create only), schedule, status, notes,
+   and technician assignment. On create, picking a recurring job reloads the form with its details and building list. *@
 @model JobFormModel
 <div asp-validation-summary="ModelOnly" class="text-danger"></div>
 <div class="row g-3">
@@ -33,16 +33,9 @@
                         <div class="form-text mt-0">Keeps this job's name, customer, site, and address, and its building list, for next time.</div>
                     </div>
                 }
-                else if (Model.BuildingsToCopy.Count > 0)
-                {
-                    <div class="form-text">
-                        Buildings copied from <strong>@Model.BuildingsSourceText</strong>: @string.Join(", ", Model.BuildingsToCopy).
-                        Spreadsheets aren't copied; upload this round's files after saving.
-                    </div>
-                }
                 else
                 {
-                    <div class="form-text">No earlier job in this series has buildings yet. Add them after saving.</div>
+                    <div class="form-text">Its details and building list are filled in below. Changes to the buildings here apply to this job; buildings you add are also saved to the recurring job for next time.</div>
                 }
             </div>
         </div>
@@ -83,6 +76,32 @@
         <input asp-for="Address" class="form-control" />
         <span asp-validation-for="Address" class="text-danger small"></span>
     </div>
+    @if (Model.IsNew)
+    {
+        <div class="col-12">
+            <fieldset id="building-rows">
+                <legend class="form-label fs-6 mb-1">Buildings</legend>
+                <div class="form-text mt-0 mb-2">List each building at this location. You can also add buildings later from the job page.</div>
+                <span asp-validation-for="Buildings" class="text-danger small d-block"></span>
+                @for (var i = 0; i < Model.Buildings.Count + 1; i++)
+                {
+                    var row = i < Model.Buildings.Count ? Model.Buildings[i] : new BuildingRowModel();
+                    <div class="row g-2 mb-2 building-row">
+                        <div class="col-sm-4">
+                            <input name="Buildings[@i].Name" value="@row.Name" class="form-control" placeholder="Building name, e.g. Building A" aria-label="Building name" maxlength="100" />
+                        </div>
+                        <div class="col">
+                            <input name="Buildings[@i].Notes" value="@row.Notes" class="form-control" placeholder="Notes (optional)" aria-label="Building notes" maxlength="2000" />
+                        </div>
+                        <div class="col-auto">
+                            <button type="button" class="btn btn-outline-danger" data-remove-building aria-label="Remove building">&times;</button>
+                        </div>
+                    </div>
+                }
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="add-building">+ Add building</button>
+            </fieldset>
+        </div>
+    }
     <div class="col-6 col-md-3">
         <label asp-for="StartDate" class="form-label"></label>
         <input asp-for="StartDate" type="date" asp-format="{0:yyyy-MM-dd}" class="form-control" />

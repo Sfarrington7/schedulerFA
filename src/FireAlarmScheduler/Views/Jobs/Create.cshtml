@@ -15,4 +15,35 @@
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <script>
+        // Building rows: "+ Add building" copies an empty row; "×" removes one. Before submitting, rows are renumbered
+        // so the server receives Buildings[0..n] with no gaps.
+        (() => {
+            const fieldset = document.getElementById('building-rows');
+            if (!fieldset) return;
+            const addButton = document.getElementById('add-building');
+            const renumber = () => fieldset.querySelectorAll('.building-row').forEach((row, i) =>
+                row.querySelectorAll('input').forEach(input => input.name = input.name.replace(/Buildings\[\d+\]/, `Buildings[${i}]`)));
+            addButton.addEventListener('click', () => {
+                const rows = fieldset.querySelectorAll('.building-row');
+                const copy = rows[rows.length - 1].cloneNode(true);
+                copy.querySelectorAll('input').forEach(input => input.value = '');
+                addButton.before(copy);
+                renumber();
+                copy.querySelector('input').focus();
+            });
+            fieldset.addEventListener('click', event => {
+                const remove = event.target.closest('[data-remove-building]');
+                if (!remove) return;
+                const row = remove.closest('.building-row');
+                if (fieldset.querySelectorAll('.building-row').length > 1) {
+                    row.remove();
+                } else {
+                    row.querySelectorAll('input').forEach(input => input.value = '');
+                }
+                renumber();
+            });
+            fieldset.closest('form').addEventListener('submit', renumber);
+        })();
+    </script>
 }

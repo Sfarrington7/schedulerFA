@@ -1,5 +1,6 @@
-// Purpose: Job scheduling rules: create, edit, and delete jobs, assign technicians, link jobs to recurring
-// jobs (copying the series' building list), manage a job's buildings, and answer date-range schedule queries.
+// Purpose: Job scheduling rules: create, edit, and delete jobs with their buildings, assign technicians, link jobs to
+// recurring jobs, manage a job's buildings (keeping a series' building list and upcoming jobs in step), and answer
+// date-range schedule queries.
 using FireAlarmScheduler.Entities;
 
 namespace FireAlarmScheduler.Services;
@@ -10,13 +11,16 @@ public class JobService
     private readonly ITechnicianRepository _technicians;
     private readonly IFileStorage _fileStorage;
     private readonly RecurringJobService _recurringJobs;
+    private readonly TimeProvider _timeProvider;
 
-    public JobService(IJobRepository jobs, ITechnicianRepository technicians, IFileStorage fileStorage, RecurringJobService recurringJobs)
+    public JobService(IJobRepository jobs, ITechnicianRepository technicians, IFileStorage fileStorage,
+        RecurringJobService recurringJobs, TimeProvider timeProvider)
     {
         _jobs = jobs;
         _technicians = technicians;
         _fileStorage = fileStorage;
         _recurringJobs = recurringJobs;
+        _timeProvider = timeProvider;
     }
 
     /// <summary>Returns all jobs ordered by start date and time.</summary>
@@ -41,27 +45,31 @@ public class JobService
             .Where(j => j.OverlapsRange(from, to) && j.AssignedTechnicianIds.Any(technicianIds.Contains)));
 
     /// <summary>
-    /// Creates a job. With <see cref="JobInput.RecurringJobId"/> it joins that recurring job and starts with a copy
-    /// of the building list (names and notes, not files) from the newest job in the series; with
-    /// <see cref="JobInput.SaveAsRecurring"/> its details are saved as a new recurring job.
+    /// Creates a job with the buildings in <see cref="JobInput.Buildings"/>. With <see cref="JobInput.RecurringJobId"/>
+    /// it joins that recurring job (starting with the series' building list if no buildings are given), and any
+    /// building new to the series is added to its list and to its upcoming jobs. With
+    /// <see cref="JobInput.SaveAsRecurring"/> its details and buildings are saved as a new recurring job.
     /// </summary>
     public async Task<Job> CreateAsync(JobInput input)
     {
         var job = new Job { Id = Guid.NewGuid() };
         await ApplyInputAsync(job, input);
+        var buildings = ValidateBuildings(input.Buildings);
 
         RecurringJob? created = null;
         if (input.RecurringJobId is { } recurringJobId)
         {
-            if (await _recurringJobs.GetAsync(recurringJobId) is null)
-            {
-                throw new ValidationFailedException("RecurringJobId", "That recurring job no longer exists. Choose another or start a new job.");
-            }
-
+            var recurringJob = await _recurringJobs.GetAsync(recurringJobId)
+                ?? throw new ValidationFailedException("RecurringJobId", "That recurring job no longer exists. Choose another or start a new job.");
             job.RecurringJobId = recurringJobId;
-            CopyBuildings(await _recurringJobs.GetLatestJobAsync(recurringJobId), job);
+            buildings ??= recurringJob.Buildings.OrderBy(b => b.SortOrder).Select(b => (b.Name, b.Notes)).ToList();
         }
-        else if (input.SaveAsRecurring)
+
+        job.Buildings = (buildings ?? [])
+            .Select((b, i) => new Building { Id = Guid.NewGuid(), JobId = job.Id, Name = b.Name, Notes = b.Notes, SortOrder = i })
+            .ToList();
+
+        if (input.RecurringJobId is null && input.SaveAsRecurring)
         {
             created = await _recurringJobs.CreateFromAsync(job);
             job.RecurringJobId = created.Id;
@@ -78,11 +86,15 @@ public class JobService
             throw;
         }
 
-        await _recurringJobs.SyncFromJobAsync(job);
+        if (input.RecurringJobId is not null)
+        {
+            await ShareBuildingsWithSeriesAsync(job, job.Buildings.Select(b => (b.Name, b.Notes)).ToList());
+            await _recurringJobs.SyncDetailsFromJobAsync(job);
+        }
+
         return job;
     }
 
-    /// <summary>Updates the job's details and assignments, keeping its buildings and files. Returns false if not found.</summary>
     /// <remarks>
     /// The recurring link can't be changed here except that a one-off job can be saved as a new recurring job
     /// (<see cref="JobInput.SaveAsRecurring"/>). If this is the newest job in its series, the recurring job's
@@ -125,25 +137,12 @@ public class JobService
 
         if (updated)
         {
-            await _recurringJobs.SyncFromJobAsync(validated);
+            await _recurringJobs.SyncDetailsFromJobAsync(validated);
         }
 
         return updated;
     }
 
-    /// <summary>Gives <paramref name="job"/> new buildings with the same names, notes, and order as <paramref name="source"/>'s.</summary>
-    private static void CopyBuildings(Job? source, Job job)
-    {
-        if (source is null)
-        {
-            return;
-        }
-
-        job.Buildings = source.Buildings
-            .OrderBy(b => b.SortOrder)
-            .Select((b, i) => new Building { Id = Guid.NewGuid(), JobId = job.Id, Name = b.Name, Notes = b.Notes, SortOrder = i })
-            .ToList();
-    }
 
     /// <summary>Deletes the job and every spreadsheet stored for its buildings. Returns false if not found.</summary>
     public async Task<bool> DeleteAsync(Guid id)
@@ -162,13 +161,18 @@ public class JobService
         return true;
     }
 
-    /// <summary>Adds a building to the job. Returns null if the job does not exist.</summary>
+    /// <summary>
+    /// Adds a building to the job. If the job is part of a recurring series, the building is also added to the
+    /// series' building list and to its upcoming jobs. Returns null if the job does not exist.
+    /// </summary>
     public async Task<Building?> AddBuildingAsync(Guid jobId, string? name, string? notes)
     {
         var buildingName = RequireText(name, "Name", "Building name", 100);
 
-        return await _jobs.UpdateAsync(jobId, job =>
+        Job? owner = null;
+        var added = await _jobs.UpdateAsync(jobId, job =>
         {
+            owner = job;
             EnsureUniqueBuildingName(job, buildingName, exceptId: null);
             var building = new Building
             {
@@ -181,26 +185,132 @@ public class JobService
             job.Buildings.Add(building);
             return building;
         });
+
+        if (added is not null && owner is not null)
+        {
+            await ShareBuildingsWithSeriesAsync(owner, [(added.Name, added.Notes)]);
+        }
+
+        return added;
     }
 
-    /// <summary>Renames a building or changes its notes. Returns false if the job or building does not exist.</summary>
+    /// <summary>
+    /// Renames a building or changes its notes. In a recurring series the same building on the series' list is
+    /// updated too, so future jobs use the new name. Returns false if the job or building does not exist.
+    /// </summary>
     public async Task<bool> UpdateBuildingAsync(Guid jobId, Guid buildingId, string? name, string? notes)
     {
         var buildingName = RequireText(name, "Name", "Building name", 100);
 
-        return await _jobs.UpdateAsync(jobId, job =>
+        var change = await _jobs.UpdateAsync(jobId, job =>
         {
             var building = job.Buildings.FirstOrDefault(b => b.Id == buildingId);
             if (building is null)
             {
-                return false;
+                return null;
             }
 
             EnsureUniqueBuildingName(job, buildingName, exceptId: buildingId);
+            var oldName = building.Name;
             building.Name = buildingName;
             building.Notes = Optional(notes);
-            return true;
+            return new { job.RecurringJobId, OldName = oldName };
         });
+
+        if (change?.RecurringJobId is { } recurringJobId)
+        {
+            await _recurringJobs.RenameBuildingAsync(recurringJobId, change.OldName, buildingName, Optional(notes));
+        }
+
+        return change is not null;
+    }
+
+    /// <summary>
+    /// Adds a building to a recurring job's building list and to its upcoming jobs. Returns false if the recurring
+    /// job doesn't exist; throws ValidationFailedException for a blank or too-long name.
+    /// </summary>
+    public async Task<bool> AddRecurringBuildingAsync(Guid recurringJobId, string? name, string? notes)
+    {
+        var buildingName = RequireText(name, "Name", "Building name", 100);
+        if (await _recurringJobs.GetAsync(recurringJobId) is null)
+        {
+            return false;
+        }
+
+        await ShareBuildingsWithSeriesAsync(recurringJobId, exceptJobId: null, [(buildingName, Optional(notes))]);
+        return true;
+    }
+
+    private Task ShareBuildingsWithSeriesAsync(Job job, List<(string Name, string? Notes)> buildings) =>
+        job.RecurringJobId is { } recurringJobId
+            ? ShareBuildingsWithSeriesAsync(recurringJobId, job.Id, buildings)
+            : Task.CompletedTask;
+
+    /// <summary>
+    /// Adds buildings to the series' building list and to the series' upcoming jobs (not started yet and not
+    /// completed, other than <paramref name="exceptJobId"/>) that don't already have a building with the same name.
+    /// </summary>
+    private async Task ShareBuildingsWithSeriesAsync(Guid recurringJobId, Guid? exceptJobId, List<(string Name, string? Notes)> buildings)
+    {
+        if (buildings.Count == 0)
+        {
+            return;
+        }
+
+        await _recurringJobs.AddBuildingsAsync(recurringJobId, buildings);
+
+        var today = ScheduleCalendar.Today(_timeProvider);
+        var upcoming = (await _jobs.GetAllAsync())
+            .Where(j => j.RecurringJobId == recurringJobId && j.Id != exceptJobId && j.StartDate > today && j.Status != JobStatus.Completed);
+        foreach (var other in upcoming)
+        {
+            await _jobs.UpdateAsync(other.Id, target =>
+            {
+                foreach (var (name, notes) in buildings.Where(b => !target.Buildings.Any(t => string.Equals(t.Name, b.Name, StringComparison.OrdinalIgnoreCase))))
+                {
+                    target.Buildings.Add(new Building
+                    {
+                        Id = Guid.NewGuid(),
+                        JobId = target.Id,
+                        Name = name,
+                        Notes = notes,
+                        SortOrder = target.Buildings.Count == 0 ? 0 : target.Buildings.Max(b => b.SortOrder) + 1
+                    });
+                }
+
+                return true;
+            });
+        }
+    }
+
+    /// <summary>
+    /// Checks Create Job building rows: blank rows are dropped, names are trimmed and must be unique (ignoring case)
+    /// and at most 100 characters. Returns null when no rows were given at all.
+    /// </summary>
+    private static List<(string Name, string? Notes)>? ValidateBuildings(IReadOnlyList<BuildingInput>? rows)
+    {
+        if (rows is null)
+        {
+            return null;
+        }
+
+        var buildings = rows.Where(r => !string.IsNullOrWhiteSpace(r.Name))
+            .Select(r => (Name: r.Name!.Trim(), Notes: Optional(r.Notes)))
+            .ToList();
+
+        var tooLong = buildings.FirstOrDefault(b => b.Name.Length > 100 || b.Notes?.Length > 2000);
+        if (tooLong.Name is not null)
+        {
+            throw new ValidationFailedException("Buildings", $"\"{tooLong.Name[..Math.Min(40, tooLong.Name.Length)]}\": building names are limited to 100 characters and notes to 2000.");
+        }
+
+        var duplicate = buildings.GroupBy(b => b.Name, StringComparer.OrdinalIgnoreCase).FirstOrDefault(g => g.Count() > 1);
+        if (duplicate is not null)
+        {
+            throw new ValidationFailedException("Buildings", $"The building \"{duplicate.Key}\" is listed more than once.");
+        }
+
+        return buildings;
     }
 
     /// <summary>Removes a building and deletes its stored spreadsheets. Returns false if not found.</summary>

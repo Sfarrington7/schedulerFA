@@ -1,5 +1,6 @@
-// Purpose: The editable fields of a job, passed from controllers to JobService for create and update,
-// plus its recurring-job choice: an existing recurring job to link to, or whether to save it as a new one.
+// Purpose: The editable fields of a job, passed from controllers to JobService for create and update, plus its
+// recurring-job choice (an existing recurring job to link to, or whether to save it as a new one) and, on create,
+// its buildings.
 using FireAlarmScheduler.Entities;
 
 namespace FireAlarmScheduler.Services;
@@ -17,4 +18,8 @@ public record JobInput(
     string? Notes,
     IReadOnlyCollection<Guid> AssignedTechnicianIds,
     Guid? RecurringJobId = null,
-    bool SaveAsRecurring = false);
+    bool SaveAsRecurring = false,
+    IReadOnlyList<BuildingInput>? Buildings = null);
+
+/// <summary>A building entered on the Create Job form. Rows with a blank name are ignored.</summary>
+public record BuildingInput(string? Name, string? Notes);
