@@ -1,7 +1,9 @@
-// Purpose: Team lead's weekly schedule grid showing which technicians are on which jobs each day.
+// Purpose: Team lead's schedule pages: a weekly grid of technicians by day, and a monthly calendar
+// showing the jobs and approved PTO of whichever technicians the team lead chooses.
 using FireAlarmScheduler.Models;
 using FireAlarmScheduler.Services;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FireAlarmScheduler.Controllers;
@@ -11,12 +13,14 @@ public class ScheduleController : Controller
 {
     private readonly JobService _jobService;
     private readonly TechnicianService _technicianService;
+    private readonly PtoService _ptoService;
     private readonly TimeProvider _timeProvider;
 
-    public ScheduleController(JobService jobService, TechnicianService technicianService, TimeProvider timeProvider)
+    public ScheduleController(JobService jobService, TechnicianService technicianService, PtoService ptoService, TimeProvider timeProvider)
     {
         _jobService = jobService;
         _technicianService = technicianService;
+        _ptoService = ptoService;
         _timeProvider = timeProvider;
     }
 
@@ -33,19 +37,80 @@ public class ScheduleController : Controller
             .Select(j => JobSummaryViewModel.FromEntity(j, lookup))
             .ToList();
 
+        var pto = await _ptoService.GetApprovedInRangeAsync(days[0], days[^1]);
+
         List<List<JobSummaryViewModel>> JobsByDay(Func<JobSummaryViewModel, bool> include) =>
             days.Select(day => jobs.Where(j => j.StartDate <= day && j.EndDate >= day && include(j)).ToList()).ToList();
 
         var rows = technicians
-            .Select(t => new WeeklyScheduleRow(t.FullName, t.Id, JobsByDay(j => j.Technicians.Any(a => a.Id == t.Id))))
+            .Select(t => new WeeklyScheduleRow(t.FullName, t.Id, JobsByDay(j => j.Technicians.Any(a => a.Id == t.Id)),
+                days.Select(day => PtoDayViewModel.ForDay(pto.Where(p => p.TechnicianId == t.Id), day, _ => t.FullName)).ToList()))
             .ToList();
 
         var unassigned = JobsByDay(j => j.Technicians.Count == 0);
         if (unassigned.Any(d => d.Count > 0))
         {
-            rows.Add(new WeeklyScheduleRow("Unassigned", null, unassigned));
+            rows.Add(new WeeklyScheduleRow("Unassigned", null, unassigned, days.Select(_ => new List<PtoDayViewModel>()).ToList()));
         }
 
         return View(new WeeklyScheduleViewModel { WeekStart = weekStart, Today = today, Days = days, Rows = rows });
+    }
+
+    /// <summary>
+    /// Shows the calendar month containing <paramref name="month"/> (default: this month) for the chosen
+    /// technicians. With no choice made yet (<paramref name="filtered"/> false) every technician is shown;
+    /// once the picker is submitted, exactly the checked technicians are shown, which may be none.
+    /// </summary>
+    public async Task<IActionResult> Month(DateOnly? month, List<Guid> technicianIds, bool filtered = false)
+    {
+        var today = ScheduleCalendar.Today(_timeProvider);
+        var first = ScheduleCalendar.StartOfMonth(month ?? today);
+        var grid = ScheduleCalendar.MonthGrid(first);
+
+        var technicians = await _technicianService.GetAllAsync();
+        var tags = TechnicianTagViewModel.ForAll(technicians);
+        var selected = filtered
+            ? technicianIds.Where(id => technicians.Any(t => t.Id == id)).ToHashSet()
+            : technicians.Select(t => t.Id).ToHashSet();
+
+        var lookup = technicians.ToLookup();
+        var jobs = (await _jobService.GetJobsForTechniciansAsync(selected, grid[0][0], grid[^1][^1]))
+            .Select(j => JobSummaryViewModel.FromEntity(j, lookup))
+            .ToList();
+
+        var pto = (await _ptoService.GetApprovedInRangeAsync(grid[0][0], grid[^1][^1]))
+            .Where(p => selected.Contains(p.TechnicianId))
+            .ToList();
+        var tagById = tags.ToDictionary(t => t.Id);
+
+        var calendar = MonthCalendarViewModel.Build(first, today, jobs,
+            job => new CalendarEntryViewModel(
+                job,
+                Url.Action("Details", "Jobs", new { id = job.Id })!,
+                tags.Where(t => selected.Contains(t.Id) && job.Technicians.Any(a => a.Id == t.Id)).ToList()),
+            day => PtoDayViewModel.ForDay(pto, day, id => tagById[id].FullName, id => tagById[id]));
+
+        return View(new MonthlyScheduleViewModel
+        {
+            Calendar = calendar,
+            Technicians = tags,
+            SelectedTechnicianIds = selected,
+            PreviousMonthUrl = MonthUrl(first.AddMonths(-1), selected, filtered),
+            NextMonthUrl = MonthUrl(first.AddMonths(1), selected, filtered),
+            ThisMonthUrl = MonthUrl(ScheduleCalendar.StartOfMonth(today), selected, filtered)
+        });
+    }
+
+    /// <summary>Builds a Month link that keeps the current technician choice (one query value per technician).</summary>
+    private string MonthUrl(DateOnly month, IEnumerable<Guid> technicianIds, bool filtered)
+    {
+        var query = new List<KeyValuePair<string, string?>> { new("month", month.ToString("yyyy-MM-dd")) };
+        if (filtered)
+        {
+            query.Add(new("filtered", "true"));
+            query.AddRange(technicianIds.Select(id => new KeyValuePair<string, string?>("technicianIds", id.ToString())));
+        }
+
+        return Url.Action(nameof(Month)) + QueryString.Create(query);
     }
 }

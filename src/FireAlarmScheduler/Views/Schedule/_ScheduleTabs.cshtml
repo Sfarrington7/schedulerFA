@@ -1,0 +1,8 @@
+@* Week / Month switch shown at the top of both team lead schedule pages. *@
+@{
+    var action = ViewContext.RouteData.Values["action"]?.ToString();
+}
+<ul class="nav nav-tabs mb-3">
+    <li class="nav-item"><a class="nav-link @(action == "Index" ? "active" : "")" asp-action="Index">Week</a></li>
+    <li class="nav-item"><a class="nav-link @(action == "Month" ? "active" : "")" asp-action="Month">Month</a></li>
+</ul>

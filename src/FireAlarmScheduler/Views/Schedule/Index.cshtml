@@ -1,8 +1,10 @@
-@* Team lead weekly grid: one row per technician, one column per day, listing the jobs they're on. *@
+@* Team lead weekly grid: one row per technician, one column per day, listing approved PTO and the jobs they're on. *@
 @model WeeklyScheduleViewModel
 @{
     ViewData["Title"] = "Weekly schedule";
 }
+
+<partial name="_ScheduleTabs" />
 
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
     <h1 class="h3 mb-0">Week of @Model.WeekStart.ToString("MMM d") – @Model.WeekEnd.ToString("MMM d, yyyy")</h1>
@@ -39,6 +41,10 @@ else
                             @for (var i = 0; i < Model.Days.Count; i++)
                             {
                                 <td class="@(Model.Days[i] == Model.Today ? "today" : "")">
+                                    @foreach (var pto in row.PtoByDay[i])
+                                    {
+                                        <span class="schedule-chip pto-entry">PTO<span class="d-block small">@pto.HoursText</span></span>
+                                    }
                                     @foreach (var job in row.JobsByDay[i])
                                     {
                                         <a class="schedule-chip" asp-controller="Jobs" asp-action="Details" asp-route-id="@job.Id" title="@job.Address · @job.TimeRangeText">

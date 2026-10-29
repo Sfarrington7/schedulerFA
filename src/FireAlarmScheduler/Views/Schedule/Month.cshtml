@@ -1,0 +1,72 @@
+@* Team lead monthly calendar. The team lead ticks which technicians to show (one, several, or all);
+   each technician has a color, and every job shows the colored initials of the chosen technicians on it. *@
+@model MonthlyScheduleViewModel
+@{
+    ViewData["Title"] = "Monthly schedule";
+}
+
+<partial name="_ScheduleTabs" />
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h1 class="h3 mb-0">@Model.Calendar.Title</h1>
+    <div class="btn-group">
+        <a class="btn btn-outline-secondary" href="@Model.PreviousMonthUrl">&larr; Previous</a>
+        <a class="btn btn-outline-secondary" href="@Model.ThisMonthUrl">This month</a>
+        <a class="btn btn-outline-secondary" href="@Model.NextMonthUrl">Next &rarr;</a>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-3">
+        <form method="get" asp-action="Month" class="card" id="technician-picker">
+            <div class="card-header fw-semibold">Show technicians</div>
+            <div class="card-body">
+                <input type="hidden" name="month" value="@Model.Calendar.Month.ToString("yyyy-MM-dd")" />
+                <input type="hidden" name="filtered" value="true" />
+                @if (Model.Technicians.Count == 0)
+                {
+                    <p class="text-body-secondary small mb-0">No technicians yet. <a asp-controller="Technicians" asp-action="Create">Add technicians</a> first.</p>
+                }
+                @foreach (var tech in Model.Technicians)
+                {
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="technicianIds" value="@tech.Id" id="show-@tech.Id"
+                               checked="@Model.SelectedTechnicianIds.Contains(tech.Id)" />
+                        <label class="form-check-label" for="show-@tech.Id">
+                            <span class="tech-tag tech-color-@tech.ColorIndex">@tech.Initials</span> @tech.FullName
+                        </label>
+                    </div>
+                }
+            </div>
+            @if (Model.Technicians.Count > 0)
+            {
+                <div class="card-footer d-flex flex-wrap gap-2">
+                    <button type="submit" class="btn btn-primary btn-sm">Update calendar</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-check-all="true">All</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-check-all="false">None</button>
+                </div>
+            }
+        </form>
+    </div>
+
+    <div class="col-lg-9">
+        @if (Model.SelectedTechnicianIds.Count == 0 && Model.Technicians.Count > 0)
+        {
+            <p class="alert alert-info">No technicians selected. Tick one or more technicians and choose <strong>Update calendar</strong>.</p>
+        }
+        <div class="card">
+            <partial name="_MonthCalendar" model="Model.Calendar" />
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // "All" / "None" tick or clear every technician box; the choice applies when the form is submitted.
+        document.querySelectorAll('#technician-picker [data-check-all]').forEach(button =>
+            button.addEventListener('click', () => {
+                const check = button.dataset.checkAll === 'true';
+                document.querySelectorAll('#technician-picker input[name="technicianIds"]').forEach(box => box.checked = check);
+            }));
+    </script>
+}

@@ -1,5 +1,6 @@
-@* Technician schedule (read-only, mobile-first): a technician's jobs for a day or week. Team leads and
-   administrators pick the technician; technician accounts always see their own linked schedule. *@
+@* Technician schedule (read-only, mobile-first): a technician's jobs for a day, a week (every day listed
+   top to bottom), or a month (calendar plus a list of the month's jobs), with approved PTO on each day. Team leads and administrators
+   pick the technician; technician accounts always see their own linked schedule. *@
 @model TechnicianScheduleViewModel
 @{
     ViewData["Title"] = "Technician View";
@@ -40,11 +41,12 @@
 @if (Model.SelectedTechnician is not null)
 {
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-        <div class="btn-group" role="group" aria-label="Day or week">
-            <a class="btn btn-sm @(Model.Range == ScheduleRange.Day ? "btn-dark" : "btn-outline-dark")"
-               asp-route-technicianId="@techId" asp-route-range="Day" asp-route-date="@Model.Date.ToString("yyyy-MM-dd")">Day</a>
-            <a class="btn btn-sm @(Model.Range == ScheduleRange.Week ? "btn-dark" : "btn-outline-dark")"
-               asp-route-technicianId="@techId" asp-route-range="Week" asp-route-date="@Model.Date.ToString("yyyy-MM-dd")">Week</a>
+        <div class="btn-group" role="group" aria-label="Day, week, or month">
+            @foreach (var option in Enum.GetValues<ScheduleRange>())
+            {
+                <a class="btn btn-sm @(Model.Range == option ? "btn-dark" : "btn-outline-dark")"
+                   asp-route-technicianId="@techId" asp-route-range="@option" asp-route-date="@Model.Date.ToString("yyyy-MM-dd")">@option</a>
+            }
         </div>
         <div class="btn-group" role="group" aria-label="Navigate dates">
             <a class="btn btn-sm btn-outline-secondary" asp-route-technicianId="@techId" asp-route-range="@range" asp-route-date="@Model.PreviousDate.ToString("yyyy-MM-dd")">&larr;</a>
@@ -54,20 +56,57 @@
     </div>
     <h2 class="h5">@Model.RangeTitle</h2>
 
-    @if (Model.Days.All(d => d.Jobs.Count == 0))
+    @if (Model.Calendar is not null)
     {
-        <p class="text-body-secondary">No jobs assigned to @Model.SelectedTechnician.FullName for this @(Model.Range == ScheduleRange.Day ? "day" : "week").</p>
-    }
-
-    @foreach (var day in Model.Days.Where(d => d.Jobs.Count > 0))
-    {
-        <h3 class="h6 mt-3 @(day.Date == Model.Today ? "text-danger" : "")">@day.Date.ToString("dddd, MMM d")@(day.Date == Model.Today ? " (today)" : "")</h3>
+        <div class="card mb-3">
+            <partial name="_MonthCalendar" model="Model.Calendar" />
+        </div>
+        <p class="small text-body-secondary d-md-none">
+            <span class="calendar-dot d-inline-block" aria-hidden="true"></span> Job
+            <span class="calendar-dot pto-dot d-inline-block ms-2" aria-hidden="true"></span> Approved PTO · Tap a day for details.
+        </p>
+        <h3 class="h6">Jobs this month</h3>
+        @if (Model.MonthJobs.Count == 0)
+        {
+            <p class="text-body-secondary">No jobs assigned to @Model.SelectedTechnician.FullName this month.</p>
+        }
         <div class="list-group mb-2">
-            @foreach (var job in day.Jobs)
+            @foreach (var entry in Model.MonthJobs)
             {
-                <partial name="_JobListItem" model="job"
-                         view-data='new ViewDataDictionary(ViewData) { ["JobUrl"] = Url.Action("Job", new { id = job.Id, technicianId = techId }) }' />
+                <partial name="_JobListItem" model="entry.Job" view-data='new ViewDataDictionary(ViewData) { ["JobUrl"] = entry.Url }' />
             }
         </div>
+    }
+    else
+    {
+        @if (Model.Days.All(d => d.Jobs.Count == 0))
+        {
+            <p class="text-body-secondary">No jobs assigned to @Model.SelectedTechnician.FullName for this @(Model.Range == ScheduleRange.Day ? "day" : "week").</p>
+        }
+
+        @foreach (var day in Model.Days)
+        {
+            <section class="schedule-day mb-3 @(day.Date == Model.Today ? "is-today" : "")">
+                <h3 class="h6 mb-1 @(day.Date == Model.Today ? "text-danger" : "")">@day.Date.ToString("dddd, MMM d")@(day.Date == Model.Today ? " (today)" : "")</h3>
+                @foreach (var pto in day.TimeOff)
+                {
+                    <div class="pto-entry rounded px-2 py-1 mb-1 small"><strong>Approved PTO</strong> · @pto.HoursText</div>
+                }
+                @if (day.Jobs.Count == 0 && day.TimeOff.Count == 0)
+                {
+                    <div class="text-body-secondary small ps-2">No jobs</div>
+                }
+                else
+                {
+                    <div class="list-group">
+                        @foreach (var job in day.Jobs)
+                        {
+                            <partial name="_JobListItem" model="job"
+                                     view-data='new ViewDataDictionary(ViewData) { ["JobUrl"] = Url.Action("Job", new { id = job.Id, technicianId = techId }) }' />
+                        }
+                    </div>
+                }
+            </section>
+        }
     }
 }

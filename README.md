@@ -10,10 +10,10 @@ Everyone signs in with an account (ASP.NET Core Identity). Each account has one 
 
 | Role | Can do |
 | --- | --- |
-| **SuperAdmin** | Everything, including creating and managing Admin and SuperAdmin accounts. |
+| **SuperAdmin** | Everything an Admin can do, including creating and managing Admin and SuperAdmin accounts. |
 | **Admin** | Manage TeamLead and Technician accounts, plus everything a team lead can do. |
-| **TeamLead** | Add technicians; create and update jobs; assign technicians; add buildings; upload or remove building spreadsheets; see every technician's schedule. |
-| **Technician** | See their own daily/weekly schedule and download spreadsheets for jobs they are assigned to. A technician account is linked to one technician record. |
+| **TeamLead** | Add technicians; create and update jobs; assign technicians; add buildings; upload or remove building spreadsheets; see every technician's schedule; approve, deny, or revoke PTO; review scheduling conflicts. |
+| **Technician** | See their own daily, weekly, or monthly schedule and download spreadsheets for jobs they are assigned to. Request PTO and cancel requests that are still pending. A technician account is linked to one technician record. |
 
 ## MVP scope
 
@@ -22,12 +22,14 @@ Everyone signs in with an account (ASP.NET Core Identity). Each account has one 
 3. **Jobs and assignments:** Create/edit/delete a job with a name, optional customer, address, start/end dates and times, status, notes, and assigned technicians.
 4. **Buildings:** Associate multiple named buildings with a job, each with its own notes and attachments.
 5. **Spreadsheet files:** Upload, list, download, and delete `.xlsx`, `.xls`, or `.csv` attachments per building. Files are transferred as-is; the app does not edit or analyze spreadsheet contents.
-6. **Field schedule:** A mobile-friendly technician view with daily/weekly assignments and job/building details.
+6. **Field schedule:** A mobile-friendly technician view with day, week (every day listed top to bottom), and month (calendar) views, plus job/building details.
 7. **Team lead overview:** List upcoming jobs, technicians, and assignments in a clear scheduling interface.
+8. **PTO:** Technicians request time off (start/end date and time, optional reason) on **My PTO**. Team leads and admins approve, deny, or revoke requests on **PTO Requests**, which warns when a request overlaps the technician's jobs. **Conflicts** lists double-booked technicians and technicians scheduled during approved PTO.
+9. **Recurring jobs:** Tick **Save as a recurring job** when creating (or editing) a job to keep its name, customer, site, and address. Next time, choose it from the **Job / project** list on Create Job: the details fill in, and the new job starts with the building list (names and notes) of the newest job in that series. Spreadsheets are not copied. **Jobs → Recurring jobs** lists them and can remove one (past jobs are kept).
 
 ### Out of scope for version one
 
-Self-service registration, password-reset emails, two-factor sign-in, multi-company support, cloud storage, notifications, editing spreadsheets in the browser, equipment/device tracking, and drag-and-drop scheduling.
+Self-service registration, password-reset emails, two-factor sign-in, multi-company support, cloud storage, notifications (including PTO decision emails), PTO balances/accrual, editing spreadsheets in the browser, equipment/device tracking, and drag-and-drop scheduling.
 
 ## Technology
 
@@ -152,7 +154,7 @@ With no accounts in the database, the app opens **First-time setup**. Create the
 5. Open each building and upload its `.xlsx`, `.xls`, or `.csv` file.
 6. **Sign out**, sign in as John, open the job from **My Schedule**, and download Building A's file.
 
-The **Schedule** page shows a weekly grid of technicians and their jobs.
+The **Schedule** page has two tabs. **Week** is a grid of technicians and their jobs by day. **Month** is a calendar where you tick which technicians to show (one, several, or all); each technician has a color, and their initials appear on their jobs. Technicians get a **Month** button on their schedule too, showing a calendar with a list of that month's jobs under it.
 
 ## Coding, comments, and testing expectations
 
@@ -187,6 +189,10 @@ Key expectations:
 ## Progress and decisions
 
 - **Current milestone:** Steps 1–7 complete. Next: usability fixes from real use.
+- **Decision (PTO):** A request is one continuous period from a start date/time to an end date/time; whole days default to 12:00 AM–11:59 PM. Requests can't start before today or overlap the technician's own pending or approved requests. Technicians can cancel only pending requests (cancelling deletes them); admins can approve, deny, or revoke (deny an approved request). Team leads, Admins, and SuperAdmins review PTO and see the Conflicts page. Approved PTO does not block assigning the technician to a job; it shows up on the Conflicts page instead.
+- **Decision (PTO on calendars):** Approved PTO shows as a striped "PTO" block on the team lead's Week grid and Month calendar (only for ticked technicians, with their colored initials) and on a technician's Day, Week, and Month views. Partial days show their hours ("From 12:00 PM", "Until 10:30 AM", or a range); time off that runs to 11:59 PM or past midnight counts as the rest of the day. Pending and denied requests are never shown on calendars.
+- **Decision (recurring jobs):** A recurring job (`RecurringJobs` table) stores only name, customer, site, and address; jobs link to it with `Jobs.RecurringJobId`. A new job in the series copies building names, notes, and order from the newest job in the series (by start date), so buildings added last time carry forward; uploaded spreadsheets are not copied because each round's files are new. The saved details follow the newest job in the series; editing an older job doesn't change them. Recurring job names must be unique. A job's series can't be changed after it's created, except that a one-off job can be saved as a new recurring job. Removing a recurring job keeps its jobs (they're unlinked).
+- **Decision (conflicts):** A technician is double-booked when two of their jobs share a day and their daily hours overlap (hours that only touch, like 8–12 and 12–4, are fine). A job conflicts with PTO when its hours on any day overlap the PTO period. Completed jobs and days before today are ignored; pending PTO appears as a warning on PTO Requests, not on the Conflicts page.
 - **Decision:** Store all records in SQL Server tables through EF Core, using a local SQL Server (`localhost`) for development. Tests use throwaway databases on a SQL Server too, so they run against the same provider and migrations as the app.
 - **Decision:** Use ASP.NET Core Identity with four fixed roles (SuperAdmin, Admin, TeamLead, Technician), seeded at startup. Roles are not created or deleted in the UI. Identity screens are hand-written MVC controllers and views, because the stock Identity UI is built on Razor Pages.
 - **Decision:** Admins manage only TeamLead and Technician accounts; only SuperAdmins can grant or change Admin/SuperAdmin. The last active SuperAdmin can't be demoted, locked, or deleted, and no one can delete or lock their own account.
@@ -196,6 +202,7 @@ Key expectations:
 - **Decision:** Buildings keep the order they were added (`SortOrder`); file bytes live outside the database under generated names.
 - **Decision:** Job times are daily working hours that apply to every day from the start date to the end date.
 - **Decision:** Building names must be unique within a job. Deleting a technician unassigns them from all jobs. Deleting a job or building deletes its files.
+- **Decision:** Month calendars run Monday–Sunday and include the days from neighboring months that fill the first and last rows. The team lead's month view shows every technician until the picker is used; the choice is kept in the page address (so Previous/Next keep it), not saved per user. Technician colors follow the technician list order, so a technician's color can change when technicians are added or removed.
 - **Decision:** Team leads and administrators can pick any technician in the Technician View (the choice is remembered in a cookie); technician accounts always see their own.
 - **Limitation:** Two people editing the same job at the same moment: the last save wins (no optimistic-concurrency check). Building-name uniqueness is checked in code, not by a database constraint.
 - **Open before real deployment:** HTTPS-only hosting, production database and backups, email confirmation and password-reset emails, audit logging, and customer-data protections.

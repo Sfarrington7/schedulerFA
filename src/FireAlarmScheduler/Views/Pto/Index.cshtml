@@ -1,0 +1,97 @@
+@* Technician PTO page: a form to request time off and a list of the technician's requests with their status.
+   Pending requests can be cancelled here; reviewed ones are changed by an administrator. *@
+@model MyPtoViewModel
+@{
+    ViewData["Title"] = "My PTO";
+}
+
+<h1 class="h3">My PTO</h1>
+
+@if (!Model.IsLinked)
+{
+    <p class="alert alert-warning">Your account isn't linked to a technician yet, so you can't request PTO. Ask an administrator to link it on the Users page.</p>
+    return;
+}
+
+<div class="row g-3">
+    <div class="col-lg-5">
+        <form asp-action="Index" method="post" class="card">
+            <div class="card-header fw-semibold">Request time off</div>
+            <div class="card-body">
+                <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+                <div class="row g-2">
+                    <div class="col-7">
+                        <label asp-for="Form.StartDate" class="form-label"></label>
+                        <input asp-for="Form.StartDate" type="date" asp-format="{0:yyyy-MM-dd}" class="form-control" />
+                        <span asp-validation-for="Form.StartDate" class="text-danger small"></span>
+                    </div>
+                    <div class="col-5">
+                        <label asp-for="Form.StartTime" class="form-label"></label>
+                        <input asp-for="Form.StartTime" type="time" asp-format="{0:HH:mm}" class="form-control" />
+                    </div>
+                    <div class="col-7">
+                        <label asp-for="Form.EndDate" class="form-label"></label>
+                        <input asp-for="Form.EndDate" type="date" asp-format="{0:yyyy-MM-dd}" class="form-control" />
+                        <span asp-validation-for="Form.EndDate" class="text-danger small"></span>
+                    </div>
+                    <div class="col-5">
+                        <label asp-for="Form.EndTime" class="form-label"></label>
+                        <input asp-for="Form.EndTime" type="time" asp-format="{0:HH:mm}" class="form-control" />
+                    </div>
+                    <div class="col-12 form-text mt-0">For whole days, keep 12:00 AM to 11:59 PM. For part of a day, set the hours you'll be away.</div>
+                    <div class="col-12">
+                        <label asp-for="Form.Reason" class="form-label"></label>
+                        <textarea asp-for="Form.Reason" class="form-control" rows="2"></textarea>
+                        <span asp-validation-for="Form.Reason" class="text-danger small"></span>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer">
+                <button type="submit" class="btn btn-primary">Submit request</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="col-lg-7">
+        <div class="card">
+            <div class="card-header fw-semibold">My requests</div>
+            @if (Model.Requests.Count == 0)
+            {
+                <div class="card-body text-body-secondary">You haven't requested any PTO yet.</div>
+            }
+            <ul class="list-group list-group-flush">
+                @foreach (var request in Model.Requests)
+                {
+                    <li class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-start gap-2">
+                            <strong>@request.PeriodText</strong>
+                            <span class="badge @request.Status.BadgeClass()">@request.Status</span>
+                        </div>
+                        @if (request.Reason is not null)
+                        {
+                            <div class="small notes">@request.Reason</div>
+                        }
+                        <div class="small text-body-secondary">
+                            Requested @request.RequestedAtUtc.ToString("MMM d, yyyy") (UTC)
+                            @if (request.ReviewedAtUtc is not null)
+                            {
+                                <span>· @request.Status.ToString().ToLowerInvariant() @request.ReviewedAtUtc.Value.ToString("MMM d")</span>
+                            }
+                        </div>
+                        @if (request.Status == PtoStatus.Pending)
+                        {
+                            <form asp-action="Cancel" asp-route-id="@request.Id" method="post" class="mt-1"
+                                  onsubmit="return confirm('Cancel this PTO request?');">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Cancel request</button>
+                            </form>
+                        }
+                    </li>
+                }
+            </ul>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

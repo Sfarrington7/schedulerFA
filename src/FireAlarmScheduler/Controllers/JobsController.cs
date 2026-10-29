@@ -1,4 +1,5 @@
-// Purpose: Job pages for team leads and administrators: list, view, create, edit, and delete jobs and assign technicians.
+// Purpose: Job pages for team leads and administrators: list, view, create (new or from a recurring job), edit, and
+// delete jobs and assign technicians.
 using FireAlarmScheduler.Models;
 using FireAlarmScheduler.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -11,12 +12,15 @@ public class JobsController : Controller
 {
     private readonly JobService _jobService;
     private readonly TechnicianService _technicianService;
+    private readonly RecurringJobService _recurringJobService;
     private readonly TimeProvider _timeProvider;
 
-    public JobsController(JobService jobService, TechnicianService technicianService, TimeProvider timeProvider)
+    public JobsController(JobService jobService, TechnicianService technicianService, RecurringJobService recurringJobService,
+        TimeProvider timeProvider)
     {
         _jobService = jobService;
         _technicianService = technicianService;
+        _recurringJobService = recurringJobService;
         _timeProvider = timeProvider;
     }
 
@@ -39,11 +43,24 @@ public class JobsController : Controller
         return View(JobDetailsViewModel.FromEntity(job, lookup));
     }
 
-    public async Task<IActionResult> Create()
+    /// <summary>
+    /// Shows the new-job form. With <paramref name="recurringJobId"/> the form starts from that recurring job's
+    /// saved details and previews the buildings that will be copied.
+    /// </summary>
+    public async Task<IActionResult> Create(Guid? recurringJobId)
     {
         var today = ScheduleCalendar.Today(_timeProvider);
         var form = new JobFormModel { StartDate = today, EndDate = today };
-        await FillTechniciansAsync(form);
+        if (recurringJobId is { } id && await _recurringJobService.GetAsync(id) is { } recurringJob)
+        {
+            form.RecurringJobId = recurringJob.Id;
+            form.Name = recurringJob.Name;
+            form.CustomerName = recurringJob.CustomerName;
+            form.SiteName = recurringJob.SiteName;
+            form.Address = recurringJob.Address;
+        }
+
+        await FillChoicesAsync(form);
         return View(form);
     }
 
@@ -55,7 +72,9 @@ public class JobsController : Controller
             try
             {
                 var job = await _jobService.CreateAsync(form.ToInput());
-                TempData["Message"] = "Job created. Add its buildings below.";
+                TempData["Message"] = job.Buildings.Count > 0
+                    ? $"Job created with {job.Buildings.Count} building(s) copied from the last {job.Name}. Upload this round's spreadsheets to each building."
+                    : "Job created. Add its buildings below.";
                 return RedirectToAction(nameof(Details), new { id = job.Id });
             }
             catch (ValidationFailedException ex)
@@ -64,7 +83,7 @@ public class JobsController : Controller
             }
         }
 
-        await FillTechniciansAsync(form);
+        await FillChoicesAsync(form);
         return View(form);
     }
 
@@ -77,7 +96,7 @@ public class JobsController : Controller
         }
 
         var form = JobFormModel.FromEntity(job);
-        await FillTechniciansAsync(form);
+        await FillChoicesAsync(form);
         return View(form);
     }
 
@@ -103,7 +122,7 @@ public class JobsController : Controller
             }
         }
 
-        await FillTechniciansAsync(form);
+        await FillChoicesAsync(form);
         return View(form);
     }
 
@@ -131,10 +150,29 @@ public class JobsController : Controller
         return RedirectToAction(nameof(Index));
     }
 
-    private async Task FillTechniciansAsync(JobFormModel form)
+    /// <summary>Fills the form's technician checkboxes and recurring-job choices, and previews copied buildings.</summary>
+    private async Task FillChoicesAsync(JobFormModel form)
     {
         form.AvailableTechnicians = (await _technicianService.GetAllAsync())
             .Select(t => new TechnicianOption(t.Id, t.FullName))
             .ToList();
+
+        if (form.IsNew)
+        {
+            form.AvailableRecurringJobs = (await _recurringJobService.GetAllAsync())
+                .Select(r => new RecurringJobOption(r.RecurringJob.Id, r.RecurringJob.Name,
+                    string.Join(" · ", new[] { r.RecurringJob.CustomerName, r.RecurringJob.Address }.Where(x => !string.IsNullOrEmpty(x)))))
+                .ToList();
+
+            if (form.RecurringJobId is { } recurringJobId && await _recurringJobService.GetLatestJobAsync(recurringJobId) is { } latest)
+            {
+                form.BuildingsSourceText = $"{latest.Name} ({latest.StartDate:MMM d, yyyy})";
+                form.BuildingsToCopy = latest.Buildings.OrderBy(b => b.SortOrder).Select(b => b.Name).ToList();
+            }
+        }
+        else if (form.Id is { } jobId && (await _jobService.GetAsync(jobId))?.RecurringJobId is { } linkedId)
+        {
+            form.LinkedRecurringJobName = (await _recurringJobService.GetAsync(linkedId))?.Name;
+        }
     }
 }

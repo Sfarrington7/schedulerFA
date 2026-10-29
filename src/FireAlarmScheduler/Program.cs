@@ -48,7 +48,9 @@ builder.Services.AddAuthorizationBuilder()
     .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build())
     .AddPolicy(AppPolicies.ManageSchedule, policy => policy.RequireRole(AppPolicies.ManageScheduleRoles))
     .AddPolicy(AppPolicies.ManageUsers, policy => policy.RequireRole(AppPolicies.ManageUsersRoles))
-    .AddPolicy(AppPolicies.ViewSchedule, policy => policy.RequireRole(AppRoles.All));
+    .AddPolicy(AppPolicies.ViewSchedule, policy => policy.RequireRole(AppRoles.All))
+    .AddPolicy(AppPolicies.ManagePto, policy => policy.RequireRole(AppPolicies.ManagePtoRoles))
+    .AddPolicy(AppPolicies.RequestPto, policy => policy.RequireRole(AppRoles.Technician));
 
 // Storage paths come from configuration and resolve against the content root, never wwwroot.
 builder.Services.AddSingleton<IFileStorage>(services =>
@@ -57,10 +59,15 @@ builder.Services.AddSingleton<IFileStorage>(services =>
 
 builder.Services.AddSingleton<ITechnicianRepository, EfTechnicianRepository>();
 builder.Services.AddSingleton<IJobRepository, EfJobRepository>();
+builder.Services.AddSingleton<IPtoRepository, EfPtoRepository>();
+builder.Services.AddSingleton<IRecurringJobRepository, EfRecurringJobRepository>();
 builder.Services.AddScoped<TechnicianService>();
+builder.Services.AddScoped<RecurringJobService>();
 builder.Services.AddScoped<JobService>();
 builder.Services.AddScoped<BuildingFileService>();
 builder.Services.AddScoped<UserAdministrationService>();
+builder.Services.AddScoped<PtoService>();
+builder.Services.AddScoped<ScheduleConflictService>();
 
 var app = builder.Build();
 

@@ -20,6 +20,9 @@ public class Job
 
     public JobStatus Status { get; set; } = JobStatus.Scheduled;
     public string? Notes { get; set; }
+
+    /// <summary>The recurring job this job belongs to, or null for a one-off job.</summary>
+    public Guid? RecurringJobId { get; set; }
     public List<JobAssignment> Assignments { get; set; } = [];
     public List<Building> Buildings { get; set; } = [];
 

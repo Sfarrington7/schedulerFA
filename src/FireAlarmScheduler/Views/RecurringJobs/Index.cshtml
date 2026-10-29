@@ -1,0 +1,58 @@
+@* Recurring jobs list: each saved recurring job with its details, how many jobs it has, and its newest job's date,
+   plus buttons to start this round's job from it or remove it (its past jobs are kept). *@
+@model List<RecurringJobListItemViewModel>
+@{
+    ViewData["Title"] = "Recurring jobs";
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h1 class="h3 mb-0">Recurring jobs</h1>
+    <a asp-controller="Jobs" asp-action="Index">&larr; All jobs</a>
+</div>
+
+@if (Model.Count == 0)
+{
+    <p class="text-body-secondary">No recurring jobs yet. Tick <strong>Save as a recurring job</strong> when creating or editing a job.</p>
+}
+else
+{
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table mb-0 align-middle">
+                <thead>
+                    <tr>
+                        <th>Job</th>
+                        <th class="d-none d-md-table-cell">Address</th>
+                        <th>Jobs</th>
+                        <th class="d-none d-sm-table-cell">Most recent</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Model)
+                    {
+                        <tr>
+                            <td>
+                                <strong>@item.Name</strong>
+                                @if (item.CustomerName is not null)
+                                {
+                                    <div class="small text-body-secondary">@item.CustomerName</div>
+                                }
+                            </td>
+                            <td class="d-none d-md-table-cell small">@item.Address@(item.SiteName is null ? "" : $" ({item.SiteName})")</td>
+                            <td>@item.JobCount</td>
+                            <td class="d-none d-sm-table-cell small">@(item.LatestStartDate?.ToString("MMM d, yyyy") ?? "—")</td>
+                            <td class="text-end text-nowrap">
+                                <a class="btn btn-sm btn-primary" asp-controller="Jobs" asp-action="Create" asp-route-recurringJobId="@item.Id">Create this round's job</a>
+                                <form asp-action="Delete" asp-route-id="@item.Id" method="post" class="d-inline"
+                                      onsubmit="return confirm('Remove this recurring job? Its past jobs are kept.');">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}

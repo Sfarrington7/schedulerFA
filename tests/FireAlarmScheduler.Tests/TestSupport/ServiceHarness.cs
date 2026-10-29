@@ -30,6 +30,8 @@ public sealed class ServiceHarness
             .AddDefaultTokenProviders();
         services.AddSingleton<ITechnicianRepository, EfTechnicianRepository>();
         services.AddSingleton<IJobRepository, EfJobRepository>();
+        services.AddSingleton<IPtoRepository, EfPtoRepository>();
+        services.AddSingleton<IRecurringJobRepository, EfRecurringJobRepository>();
         services.AddScoped<UserAdministrationService>();
 
         var provider = services.BuildServiceProvider();
@@ -39,12 +41,17 @@ public sealed class ServiceHarness
         ContextFactory = provider.GetRequiredService<IDbContextFactory<AppDbContext>>();
         Technicians = provider.GetRequiredService<ITechnicianRepository>();
         Jobs = provider.GetRequiredService<IJobRepository>();
+        PtoRequests = provider.GetRequiredService<IPtoRepository>();
+        RecurringJobRepository = provider.GetRequiredService<IRecurringJobRepository>();
         FileStorage = new LocalFileStorage(UploadsDirectory);
         UserManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         UserAdmin = scope.ServiceProvider.GetRequiredService<UserAdministrationService>();
 
         TechnicianService = new TechnicianService(Technicians);
-        JobService = new JobService(Jobs, Technicians, FileStorage);
+        RecurringJobService = new RecurringJobService(RecurringJobRepository, Jobs);
+        JobService = new JobService(Jobs, Technicians, FileStorage, RecurringJobService);
+        PtoService = new PtoService(PtoRequests, Technicians, new FixedTimeProvider(Now));
+        ConflictService = new ScheduleConflictService(Jobs, PtoRequests);
         FileService = new BuildingFileService(Jobs, FileStorage,
             Options.Create(new StorageOptions { MaxFileSizeBytes = maxFileSizeBytes }), new FixedTimeProvider(Now));
     }
@@ -53,12 +60,21 @@ public sealed class ServiceHarness
     public IDbContextFactory<AppDbContext> ContextFactory { get; }
     public ITechnicianRepository Technicians { get; }
     public IJobRepository Jobs { get; }
+    public IPtoRepository PtoRequests { get; }
+    public IRecurringJobRepository RecurringJobRepository { get; }
+    public RecurringJobService RecurringJobService { get; }
     public IFileStorage FileStorage { get; }
     public UserManager<ApplicationUser> UserManager { get; }
     public UserAdministrationService UserAdmin { get; }
     public TechnicianService TechnicianService { get; }
     public JobService JobService { get; }
     public BuildingFileService FileService { get; }
+    public PtoService PtoService { get; }
+    public ScheduleConflictService ConflictService { get; }
+
+    /// <summary>A full-day PTO input from <paramref name="first"/> to <paramref name="last"/> (12:00 AM – 11:59 PM).</summary>
+    public static PtoInput FullDays(DateOnly first, DateOnly last, string? reason = null) =>
+        new(first, new TimeOnly(0, 0), last, new TimeOnly(23, 59), reason);
 
     /// <summary>A valid job input for Nov 2–6, 2026, 8:00–16:00; override fields with a `with` expression.</summary>
     public static JobInput ValidJob(params Guid[] technicianIds) => new(
