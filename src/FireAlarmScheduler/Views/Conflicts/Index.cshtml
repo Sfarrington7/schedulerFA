@@ -35,7 +35,7 @@
                             <td>@row.TechnicianName</td>
                             <td class="text-nowrap">@row.Job.DatesText</td>
                             <td><a asp-controller="Jobs" asp-action="Details" asp-route-id="@row.Job.JobId">@row.Job.JobName</a><div class="small text-body-secondary">@row.Job.HoursText</div></td>
-                            <td><a asp-controller="Jobs" asp-action="Details" asp-route-id="@row.OtherJob!.JobId">@row.OtherJob.JobName</a><div class="small text-body-secondary">@row.OtherJob.HoursText</div></td>
+                            <td><a asp-controller="Jobs" asp-action="Details" asp-route-id="@row.OtherJob!.JobId">@row.OtherJob!.JobName</a><div class="small text-body-secondary">@row.OtherJob!.HoursText</div></td>
                         </tr>
                     }
                 </tbody>

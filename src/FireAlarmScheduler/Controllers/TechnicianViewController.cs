@@ -1,4 +1,4 @@
-// Purpose: The technician-facing, read-only pages: a daily, weekly, or monthly schedule and assigned job details
+// Purpose: The technician-facing, read-only pages: a daily, weekly, or monthly schedule (jobs and approved PTO) and assigned job details
 // with building spreadsheets. Technician accounts only ever see their own linked technician;
 // team leads and administrators can pick any technician.
 using FireAlarmScheduler.Entities;
@@ -20,10 +20,12 @@ public class TechnicianViewController : Controller
     private readonly TechnicianService _technicianService;
     private readonly TimeProvider _timeProvider;
     private readonly UserManager<ApplicationUser> _userManager;
+    private readonly PtoService _ptoService;
 
     public TechnicianViewController(JobService jobService, TechnicianService technicianService, TimeProvider timeProvider,
-        UserManager<ApplicationUser> userManager)
+        UserManager<ApplicationUser> userManager, PtoService ptoService)
     {
+        _ptoService = ptoService;
         _jobService = jobService;
         _technicianService = technicianService;
         _timeProvider = timeProvider;
@@ -63,13 +65,17 @@ public class TechnicianViewController : Controller
         };
 
         var jobs = new List<JobSummaryViewModel>();
+        var pto = new List<PtoRequest>();
         if (selected is not null)
         {
             var lookup = technicians.ToLookup();
             jobs = (await _jobService.GetJobsForTechnicianAsync(selected.Id, from, to))
                 .Select(j => JobSummaryViewModel.FromEntity(j, lookup))
                 .ToList();
+            pto = (await _ptoService.GetApprovedInRangeAsync(from, to)).Where(p => p.TechnicianId == selected.Id).ToList();
         }
+
+        List<PtoDayViewModel> PtoOn(DateOnly day) => PtoDayViewModel.ForDay(pto, day, _ => selected!.FullName);
 
         CalendarEntryViewModel EntryFor(JobSummaryViewModel job) =>
             new(job, Url.Action(nameof(Job), new { id = job.Id, technicianId = selected?.Id })!, []);
@@ -79,7 +85,7 @@ public class TechnicianViewController : Controller
         var days = new List<ScheduleDayViewModel>();
         if (selected is not null && range == ScheduleRange.Month)
         {
-            calendar = MonthCalendarViewModel.Build(selectedDate, today, jobs, EntryFor,
+            calendar = MonthCalendarViewModel.Build(selectedDate, today, jobs, EntryFor, PtoOn,
                 day => Url.Action(nameof(Index), new { technicianId = selected.Id, range = ScheduleRange.Day, date = day.ToString("yyyy-MM-dd") }));
             var month = ScheduleCalendar.StartOfMonth(selectedDate);
             monthJobs = jobs.Where(j => j.OverlapsRange(month, month.AddMonths(1).AddDays(-1))).Select(EntryFor).ToList();
@@ -87,7 +93,7 @@ public class TechnicianViewController : Controller
         else if (selected is not null)
         {
             days = ScheduleCalendar.DaysBetween(from, to)
-                .Select(day => new ScheduleDayViewModel(day, jobs.Where(j => j.OverlapsRange(day, day)).ToList()))
+                .Select(day => new ScheduleDayViewModel(day, jobs.Where(j => j.OverlapsRange(day, day)).ToList(), PtoOn(day)))
                 .ToList();
         }
 

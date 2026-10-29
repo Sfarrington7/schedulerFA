@@ -37,6 +37,13 @@ public class PtoService
             .ThenBy(p => p.StartsAt)
             .ToList();
 
+    /// <summary>Approved requests (all technicians) that cover any day from <paramref name="from"/> to <paramref name="to"/>.</summary>
+    public async Task<List<PtoRequest>> GetApprovedInRangeAsync(DateOnly from, DateOnly to) =>
+        (await _requests.GetAllAsync())
+            .Where(p => p.Status == PtoStatus.Approved && p.StartDate <= to && p.EndDate >= from)
+            .OrderBy(p => p.StartsAt)
+            .ToList();
+
     /// <summary>
     /// Records a pending request. Rejects periods that end before they start, start before today, or overlap
     /// one of the technician's own pending or approved requests.

@@ -15,8 +15,8 @@ public static class AppRoles
     public static string Describe(string role) => role switch
     {
         SuperAdmin => "Full access, including managing Admin and SuperAdmin accounts.",
-        Admin => "Manages TeamLead and Technician accounts, approves PTO, and reviews scheduling conflicts, plus everything a team lead can do.",
-        TeamLead => "Manages technicians, jobs, buildings, files, and the team schedule.",
+        Admin => "Manages TeamLead and Technician accounts, plus everything a team lead can do.",
+        TeamLead => "Manages technicians, jobs, buildings, files, and the team schedule; approves or denies PTO and reviews scheduling conflicts.",
         Technician => "Sees their own schedule, downloads files for jobs they are assigned to, and requests PTO.",
         _ => ""
     };
@@ -41,5 +41,5 @@ public static class AppPolicies
 
     public static readonly string[] ManageScheduleRoles = [AppRoles.SuperAdmin, AppRoles.Admin, AppRoles.TeamLead];
     public static readonly string[] ManageUsersRoles = [AppRoles.SuperAdmin, AppRoles.Admin];
-    public static readonly string[] ManagePtoRoles = [AppRoles.SuperAdmin, AppRoles.Admin];
+    public static readonly string[] ManagePtoRoles = [AppRoles.SuperAdmin, AppRoles.Admin, AppRoles.TeamLead];
 }

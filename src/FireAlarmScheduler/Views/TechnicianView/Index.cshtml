@@ -1,5 +1,5 @@
 @* Technician schedule (read-only, mobile-first): a technician's jobs for a day, a week (every day listed
-   top to bottom), or a month (calendar plus a list of the month's jobs). Team leads and administrators
+   top to bottom), or a month (calendar plus a list of the month's jobs), with approved PTO on each day. Team leads and administrators
    pick the technician; technician accounts always see their own linked schedule. *@
 @model TechnicianScheduleViewModel
 @{
@@ -61,6 +61,10 @@
         <div class="card mb-3">
             <partial name="_MonthCalendar" model="Model.Calendar" />
         </div>
+        <p class="small text-body-secondary d-md-none">
+            <span class="calendar-dot d-inline-block" aria-hidden="true"></span> Job
+            <span class="calendar-dot pto-dot d-inline-block ms-2" aria-hidden="true"></span> Approved PTO · Tap a day for details.
+        </p>
         <h3 class="h6">Jobs this month</h3>
         @if (Model.MonthJobs.Count == 0)
         {
@@ -84,7 +88,11 @@
         {
             <section class="schedule-day mb-3 @(day.Date == Model.Today ? "is-today" : "")">
                 <h3 class="h6 mb-1 @(day.Date == Model.Today ? "text-danger" : "")">@day.Date.ToString("dddd, MMM d")@(day.Date == Model.Today ? " (today)" : "")</h3>
-                @if (day.Jobs.Count == 0)
+                @foreach (var pto in day.TimeOff)
+                {
+                    <div class="pto-entry rounded px-2 py-1 mb-1 small"><strong>Approved PTO</strong> · @pto.HoursText</div>
+                }
+                @if (day.Jobs.Count == 0 && day.TimeOff.Count == 0)
                 {
                     <div class="text-body-secondary small ps-2">No jobs</div>
                 }

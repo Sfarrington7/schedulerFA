@@ -1,5 +1,5 @@
 // Purpose: Tests PTO over HTTP: a technician submits and cancels requests through the My PTO form, administrators
-// approve and revoke them and see job overlaps, the conflicts page lists double bookings and jobs during approved
+// (and team leads) approve and revoke them and see job overlaps, the conflicts page lists double bookings and jobs during approved
 // PTO, and each role can only reach the pages it should. The clock is fixed to Nov 3, 2026.
 using System.Net;
 using FireAlarmScheduler.Entities;
@@ -28,8 +28,8 @@ public class PtoTests : IDisposable
     [InlineData(AppRoles.Technician, "/PtoRequests", false)]
     [InlineData(AppRoles.Technician, "/Conflicts", false)]
     [InlineData(AppRoles.TeamLead, "/Pto", false)]
-    [InlineData(AppRoles.TeamLead, "/PtoRequests", false)]
-    [InlineData(AppRoles.TeamLead, "/Conflicts", false)]
+    [InlineData(AppRoles.TeamLead, "/PtoRequests", true)]
+    [InlineData(AppRoles.TeamLead, "/Conflicts", true)]
     [InlineData(AppRoles.Admin, "/PtoRequests", true)]
     [InlineData(AppRoles.Admin, "/PtoRequests?filter=All", true)]
     [InlineData(AppRoles.Admin, "/Conflicts", true)]
@@ -234,11 +234,33 @@ public class PtoTests : IDisposable
         var john = await Service<TechnicianService>().AddAsync("John", "Smith");
         var technicianNav = await (await _factory.SignInAsNewUserAsync(AppRoles.Technician, technicianId: john.Id)).GetStringAsync("/TechnicianView");
         var adminNav = await (await _factory.SignInAsNewUserAsync(AppRoles.Admin)).GetStringAsync("/Jobs");
+        var teamLeadNav = await (await _factory.SignInAsNewUserAsync(AppRoles.TeamLead)).GetStringAsync("/Jobs");
 
         Assert.Contains(">My PTO<", technicianNav);
         Assert.DoesNotContain(">PTO Requests<", technicianNav);
         Assert.Contains(">PTO Requests<", adminNav);
         Assert.Contains(">Conflicts<", adminNav);
         Assert.DoesNotContain(">My PTO<", adminNav);
+        Assert.Contains(">PTO Requests<", teamLeadNav);
+        Assert.Contains(">Conflicts<", teamLeadNav);
+    }
+
+    [Fact]
+    public async Task Approve_TeamLead_CanApproveAndDeny()
+    {
+        var john = await Service<TechnicianService>().AddAsync("John", "Smith");
+        var first = await Service<PtoService>().SubmitAsync(john.Id, ServiceHarness.FullDays(new DateOnly(2026, 11, 20), new DateOnly(2026, 11, 20)));
+        var second = await Service<PtoService>().SubmitAsync(john.Id, ServiceHarness.FullDays(new DateOnly(2026, 11, 27), new DateOnly(2026, 11, 27)));
+        var teamLead = await _factory.SignInAsNewUserAsync(AppRoles.TeamLead);
+
+        var approved = await FormPoster.PostFormAsync(teamLead, "/PtoRequests", $"/PtoRequests/Approve/{first.Id}");
+        var denied = await FormPoster.PostFormAsync(teamLead, "/PtoRequests", $"/PtoRequests/Deny/{second.Id}");
+
+        Assert.Contains("PTO approved.", await approved.Content.ReadAsStringAsync());
+        Assert.Contains("PTO denied.", await denied.Content.ReadAsStringAsync());
+        var stored = Service<IPtoRepository>();
+        Assert.Equal(PtoStatus.Approved, (await stored.GetByIdAsync(first.Id))!.Status);
+        Assert.Equal(PtoStatus.Denied, (await stored.GetByIdAsync(second.Id))!.Status);
+        Assert.StartsWith("teamlead-", (await stored.GetByIdAsync(first.Id))!.ReviewedBy);
     }
 }

@@ -11,8 +11,8 @@ Everyone signs in with an account (ASP.NET Core Identity). Each account has one 
 | Role | Can do |
 | --- | --- |
 | **SuperAdmin** | Everything an Admin can do, including creating and managing Admin and SuperAdmin accounts. |
-| **Admin** | Manage TeamLead and Technician accounts; approve, deny, or revoke PTO; review scheduling conflicts; plus everything a team lead can do. |
-| **TeamLead** | Add technicians; create and update jobs; assign technicians; add buildings; upload or remove building spreadsheets; see every technician's schedule. |
+| **Admin** | Manage TeamLead and Technician accounts, plus everything a team lead can do. |
+| **TeamLead** | Add technicians; create and update jobs; assign technicians; add buildings; upload or remove building spreadsheets; see every technician's schedule; approve, deny, or revoke PTO; review scheduling conflicts. |
 | **Technician** | See their own daily, weekly, or monthly schedule and download spreadsheets for jobs they are assigned to. Request PTO and cancel requests that are still pending. A technician account is linked to one technician record. |
 
 ## MVP scope
@@ -24,7 +24,7 @@ Everyone signs in with an account (ASP.NET Core Identity). Each account has one 
 5. **Spreadsheet files:** Upload, list, download, and delete `.xlsx`, `.xls`, or `.csv` attachments per building. Files are transferred as-is; the app does not edit or analyze spreadsheet contents.
 6. **Field schedule:** A mobile-friendly technician view with day, week (every day listed top to bottom), and month (calendar) views, plus job/building details.
 7. **Team lead overview:** List upcoming jobs, technicians, and assignments in a clear scheduling interface.
-8. **PTO:** Technicians request time off (start/end date and time, optional reason) on **My PTO**. Admins approve, deny, or revoke requests on **PTO Requests**, which warns when a request overlaps the technician's jobs. **Conflicts** lists double-booked technicians and technicians scheduled during approved PTO.
+8. **PTO:** Technicians request time off (start/end date and time, optional reason) on **My PTO**. Team leads and admins approve, deny, or revoke requests on **PTO Requests**, which warns when a request overlaps the technician's jobs. **Conflicts** lists double-booked technicians and technicians scheduled during approved PTO.
 
 ### Out of scope for version one
 
@@ -188,7 +188,8 @@ Key expectations:
 ## Progress and decisions
 
 - **Current milestone:** Steps 1–7 complete. Next: usability fixes from real use.
-- **Decision (PTO):** A request is one continuous period from a start date/time to an end date/time; whole days default to 12:00 AM–11:59 PM. Requests can't start before today or overlap the technician's own pending or approved requests. Technicians can cancel only pending requests (cancelling deletes them); admins can approve, deny, or revoke (deny an approved request). Only Admin and SuperAdmin review PTO; team leads don't. Approved PTO does not block assigning the technician to a job; it shows up on the Conflicts page instead.
+- **Decision (PTO):** A request is one continuous period from a start date/time to an end date/time; whole days default to 12:00 AM–11:59 PM. Requests can't start before today or overlap the technician's own pending or approved requests. Technicians can cancel only pending requests (cancelling deletes them); admins can approve, deny, or revoke (deny an approved request). Team leads, Admins, and SuperAdmins review PTO and see the Conflicts page. Approved PTO does not block assigning the technician to a job; it shows up on the Conflicts page instead.
+- **Decision (PTO on calendars):** Approved PTO shows as a striped "PTO" block on the team lead's Week grid and Month calendar (only for ticked technicians, with their colored initials) and on a technician's Day, Week, and Month views. Partial days show their hours ("From 12:00 PM", "Until 10:30 AM", or a range); time off that runs to 11:59 PM or past midnight counts as the rest of the day. Pending and denied requests are never shown on calendars.
 - **Decision (conflicts):** A technician is double-booked when two of their jobs share a day and their daily hours overlap (hours that only touch, like 8–12 and 12–4, are fine). A job conflicts with PTO when its hours on any day overlap the PTO period. Completed jobs and days before today are ignored; pending PTO appears as a warning on PTO Requests, not on the Conflicts page.
 - **Decision:** Store all records in SQL Server tables through EF Core, using a local SQL Server (`localhost`) for development. Tests use throwaway databases on a SQL Server too, so they run against the same provider and migrations as the app.
 - **Decision:** Use ASP.NET Core Identity with four fixed roles (SuperAdmin, Admin, TeamLead, Technician), seeded at startup. Roles are not created or deleted in the UI. Identity screens are hand-written MVC controllers and views, because the stock Identity UI is built on Razor Pages.

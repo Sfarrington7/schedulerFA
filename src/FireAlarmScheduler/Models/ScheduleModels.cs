@@ -1,8 +1,44 @@
 // Purpose: View models for date-organized pages: the dashboard, the team lead's weekly grid and
-// monthly calendar, and the technician's daily/weekly/monthly schedule.
+// monthly calendar, and the technician's daily/weekly/monthly schedule, including approved PTO on each day.
 namespace FireAlarmScheduler.Models;
 
-public record ScheduleDayViewModel(DateOnly Date, List<JobSummaryViewModel> Jobs);
+/// <summary>One day of a schedule list: its jobs and any approved time off (PTO is only filled on technician schedules).</summary>
+public record ScheduleDayViewModel(DateOnly Date, List<JobSummaryViewModel> Jobs, List<PtoDayViewModel>? Pto = null)
+{
+    public List<PtoDayViewModel> TimeOff => Pto ?? [];
+}
+
+/// <summary>
+/// The part of one technician's approved PTO that falls on one day. <see cref="Tag"/> carries the technician's
+/// color and initials where several technicians share a view; it is null on a technician's own schedule.
+/// </summary>
+public record PtoDayViewModel(Guid TechnicianId, string TechnicianName, string HoursText, TechnicianTagViewModel? Tag)
+{
+    /// <summary>Returns the PTO shown on <paramref name="day"/> for <paramref name="request"/>, or null if it doesn't cover that day.</summary>
+    public static PtoDayViewModel? For(Entities.PtoRequest request, DateOnly day, string technicianName, TechnicianTagViewModel? tag = null)
+    {
+        if (request.PortionOn(day) is not { } portion)
+        {
+            return null;
+        }
+
+        var hours = (portion.Start, portion.End) switch
+        {
+            ({ Hour: 0, Minute: 0 }, null) => "All day",
+            (_, null) => $"From {portion.Start:h:mm tt}",
+            ({ Hour: 0, Minute: 0 }, { } end) => $"Until {end:h:mm tt}",
+            var (start, end) => $"{start:h:mm tt} – {end:h:mm tt}"
+        };
+        return new PtoDayViewModel(request.TechnicianId, technicianName, hours, tag);
+    }
+
+    /// <summary>Every approved PTO block on <paramref name="day"/> from <paramref name="requests"/>.</summary>
+    public static List<PtoDayViewModel> ForDay(IEnumerable<Entities.PtoRequest> requests, DateOnly day,
+        Func<Guid, string> nameOf, Func<Guid, TechnicianTagViewModel?>? tagOf = null) =>
+        requests.Select(r => For(r, day, nameOf(r.TechnicianId), tagOf?.Invoke(r.TechnicianId)))
+            .OfType<PtoDayViewModel>()
+            .ToList();
+}
 
 public class DashboardViewModel
 {
@@ -16,7 +52,7 @@ public class DashboardViewModel
 }
 
 /// <summary>One row of the weekly grid: a technician (or "Unassigned") and their jobs on each day.</summary>
-public record WeeklyScheduleRow(string Label, Guid? TechnicianId, List<List<JobSummaryViewModel>> JobsByDay);
+public record WeeklyScheduleRow(string Label, Guid? TechnicianId, List<List<JobSummaryViewModel>> JobsByDay, List<List<PtoDayViewModel>> PtoByDay);
 
 public class WeeklyScheduleViewModel
 {
@@ -52,7 +88,8 @@ public record TechnicianTagViewModel(Guid Id, string FullName, string Initials, 
 /// <summary>One job on one calendar day, with where it links to and which shown technicians are on it.</summary>
 public record CalendarEntryViewModel(JobSummaryViewModel Job, string Url, List<TechnicianTagViewModel> Technicians);
 
-public record CalendarDayViewModel(DateOnly Date, bool InMonth, bool IsToday, string? DayUrl, List<CalendarEntryViewModel> Entries);
+public record CalendarDayViewModel(DateOnly Date, bool InMonth, bool IsToday, string? DayUrl, List<CalendarEntryViewModel> Entries,
+    List<PtoDayViewModel> Pto);
 
 public class MonthCalendarViewModel
 {
@@ -65,10 +102,12 @@ public class MonthCalendarViewModel
 
     /// <summary>
     /// Places each job on every grid day it runs. <paramref name="entryFor"/> builds the calendar entry
-    /// (link and technician tags) for a job; <paramref name="dayUrl"/> optionally links each day number.
+    /// (link and technician tags) for a job; <paramref name="ptoFor"/> lists approved time off on a day;
+    /// <paramref name="dayUrl"/> optionally links each day number.
     /// </summary>
     public static MonthCalendarViewModel Build(DateOnly month, DateOnly today, IReadOnlyList<JobSummaryViewModel> jobs,
-        Func<JobSummaryViewModel, CalendarEntryViewModel> entryFor, Func<DateOnly, string?>? dayUrl = null)
+        Func<JobSummaryViewModel, CalendarEntryViewModel> entryFor, Func<DateOnly, List<PtoDayViewModel>> ptoFor,
+        Func<DateOnly, string?>? dayUrl = null)
     {
         var entries = jobs.Select(entryFor).ToList();
         var first = Services.ScheduleCalendar.StartOfMonth(month);
@@ -82,7 +121,8 @@ public class MonthCalendarViewModel
                     day.Month == first.Month,
                     day == today,
                     dayUrl?.Invoke(day),
-                    entries.Where(e => e.Job.OverlapsRange(day, day)).ToList())).ToList())
+                    entries.Where(e => e.Job.OverlapsRange(day, day)).ToList(),
+                    ptoFor(day))).ToList())
                 .ToList()
         };
     }

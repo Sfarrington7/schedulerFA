@@ -198,3 +198,21 @@ body {
   padding-left: .5rem;
   border-left: 3px solid var(--app-accent);
 }
+
+/* Approved PTO: striped so time off is never mistaken for a job. */
+.pto-entry,
+.calendar-entry.pto-entry {
+  background: repeating-linear-gradient(135deg, #fde7c7 0, #fde7c7 6px, #fbd9a5 6px, #fbd9a5 12px);
+  color: #7a4100;
+  font-weight: 600;
+}
+
+.calendar-dot.pto-dot {
+  background-color: #e8890c;
+}
+
+@media (max-width: 767.98px) {
+  .calendar-entry.pto-entry {
+    background: none;
+  }
+}

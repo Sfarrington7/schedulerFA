@@ -1,5 +1,5 @@
-@* Monday–Sunday month grid used by the team lead and technician month views. Each day lists its jobs,
-   tagged with the shown technicians' colored initials; on phones job names collapse to colored dots. *@
+@* Monday–Sunday month grid used by the team lead and technician month views. Each day lists approved PTO
+   (striped) and then its jobs, tagged with the shown technicians' colored initials; on phones names collapse to dots. *@
 @model MonthCalendarViewModel
 <div class="table-responsive">
     <table class="table table-bordered month-calendar mb-0" aria-label="@Model.Title">
@@ -25,6 +25,17 @@
                             else
                             {
                                 <span class="day-number">@day.Date.Day</span>
+                            }
+                            @foreach (var pto in day.Pto)
+                            {
+                                <div class="calendar-entry pto-entry" title="@pto.TechnicianName · PTO · @pto.HoursText">
+                                    @if (pto.Tag is not null)
+                                    {
+                                        <span class="tech-tag tech-color-@pto.Tag.ColorIndex">@pto.Tag.Initials</span>
+                                    }
+                                    <span class="calendar-entry-name">PTO@(pto.HoursText == "All day" ? "" : $" · {pto.HoursText}")</span>
+                                    <span class="calendar-dot pto-dot" aria-hidden="true"></span>
+                                </div>
                             }
                             @foreach (var entry in day.Entries)
                             {

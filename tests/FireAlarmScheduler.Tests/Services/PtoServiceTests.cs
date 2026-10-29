@@ -195,4 +195,25 @@ public class PtoServiceTests : IDisposable
 
         Assert.Empty(await Pto.GetAllAsync());
     }
+
+    [Fact]
+    public async Task GetApprovedInRangeAsync_OnlyApprovedRequestsTouchingTheRange()
+    {
+        var john = await _harness.TechnicianService.AddAsync("John", "Smith");
+        var inside = await Pto.SubmitAsync(john.Id, ServiceHarness.FullDays(Nov10, Nov10.AddDays(1)));
+        var spanningStart = await Pto.SubmitAsync(john.Id, ServiceHarness.FullDays(Nov10.AddDays(-4), Nov10.AddDays(-2)));
+        var outside = await Pto.SubmitAsync(john.Id, ServiceHarness.FullDays(Nov10.AddDays(20), Nov10.AddDays(20)));
+        var denied = await Pto.SubmitAsync(john.Id, ServiceHarness.FullDays(Nov10.AddDays(3), Nov10.AddDays(3)));
+        await Pto.SubmitAsync(john.Id, ServiceHarness.FullDays(Nov10.AddDays(4), Nov10.AddDays(4)));
+        foreach (var id in new[] { inside.Id, spanningStart.Id, outside.Id })
+        {
+            await Pto.ReviewAsync(id, PtoStatus.Approved, "admin@example.test");
+        }
+
+        await Pto.ReviewAsync(denied.Id, PtoStatus.Denied, "admin@example.test");
+
+        var approved = await Pto.GetApprovedInRangeAsync(Nov10.AddDays(-2), Nov10.AddDays(5));
+
+        Assert.Equal([spanningStart.Id, inside.Id], approved.Select(p => p.Id));
+    }
 }
