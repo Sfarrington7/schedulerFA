@@ -216,3 +216,18 @@ body {
     background: none;
   }
 }
+
+/* Conflicts page: both tables use the same fixed column widths so their columns line up. */
+.conflict-table {
+  table-layout: fixed;
+  min-width: 40rem;
+}
+
+.conflict-table .conflict-col-technician { width: 18%; }
+.conflict-table .conflict-col-dates { width: 18%; }
+.conflict-table .conflict-col-job { width: 32%; }
+.conflict-table .conflict-col-other { width: 32%; }
+
+.conflict-table td {
+  overflow-wrap: anywhere;
+}

@@ -1,5 +1,6 @@
 @* Administrators' scheduling conflicts page: technicians on two overlapping jobs, and technicians assigned
-   to jobs during approved PTO, from today onward. Each row links to the jobs to fix them. *@
+   to jobs during approved PTO, from today onward. Each row links to the jobs to fix them. Both tables share
+   fixed column widths so their columns line up. *@
 @model ConflictsViewModel
 @{
     ViewData["Title"] = "Scheduling conflicts";
@@ -24,7 +25,13 @@
     else
     {
         <div class="table-responsive">
-            <table class="table mb-0 align-middle">
+            <table class="table mb-0 align-middle conflict-table">
+                <colgroup>
+                    <col class="conflict-col-technician" />
+                    <col class="conflict-col-dates" />
+                    <col class="conflict-col-job" />
+                    <col class="conflict-col-other" />
+                </colgroup>
                 <thead>
                     <tr><th>Technician</th><th>Dates</th><th>Job</th><th>Overlaps with</th></tr>
                 </thead>
@@ -33,7 +40,7 @@
                     {
                         <tr>
                             <td>@row.TechnicianName</td>
-                            <td class="text-nowrap">@row.Job.DatesText</td>
+                            <td>@row.Job.DatesText</td>
                             <td><a asp-controller="Jobs" asp-action="Details" asp-route-id="@row.Job.JobId">@row.Job.JobName</a><div class="small text-body-secondary">@row.Job.HoursText</div></td>
                             <td><a asp-controller="Jobs" asp-action="Details" asp-route-id="@row.OtherJob!.JobId">@row.OtherJob!.JobName</a><div class="small text-body-secondary">@row.OtherJob!.HoursText</div></td>
                         </tr>
@@ -53,7 +60,13 @@
     else
     {
         <div class="table-responsive">
-            <table class="table mb-0 align-middle">
+            <table class="table mb-0 align-middle conflict-table">
+                <colgroup>
+                    <col class="conflict-col-technician" />
+                    <col class="conflict-col-dates" />
+                    <col class="conflict-col-job" />
+                    <col class="conflict-col-other" />
+                </colgroup>
                 <thead>
                     <tr><th>Technician</th><th>Dates</th><th>Job</th><th>Approved PTO</th></tr>
                 </thead>
@@ -62,7 +75,7 @@
                     {
                         <tr>
                             <td>@row.TechnicianName</td>
-                            <td class="text-nowrap">@row.Job.DatesText</td>
+                            <td>@row.Job.DatesText</td>
                             <td><a asp-controller="Jobs" asp-action="Details" asp-route-id="@row.Job.JobId">@row.Job.JobName</a><div class="small text-body-secondary">@row.Job.HoursText</div></td>
                             <td class="small">@row.Pto!.PeriodText</td>
                         </tr>
