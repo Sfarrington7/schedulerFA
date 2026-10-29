@@ -1,0 +1,81 @@
+@* Administrators' PTO review page: requests (pending only, or all) with any jobs they overlap, and buttons
+   to approve or deny. Denying an approved request revokes it; approving a denied one reinstates it. *@
+@model PtoReviewViewModel
+@{
+    ViewData["Title"] = "PTO Requests";
+    var filter = Model.Filter.ToString();
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h1 class="h3 mb-0">PTO Requests</h1>
+    <a asp-controller="Conflicts" asp-action="Index">Scheduling conflicts &rarr;</a>
+</div>
+
+<ul class="nav nav-tabs mb-3">
+    <li class="nav-item">
+        <a class="nav-link @(Model.Filter == PtoRequestFilter.Pending ? "active" : "")" asp-route-filter="Pending">
+            Pending <span class="badge text-bg-warning">@Model.PendingCount</span>
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link @(Model.Filter == PtoRequestFilter.All ? "active" : "")" asp-route-filter="All">All requests</a>
+    </li>
+</ul>
+
+@if (Model.Requests.Count == 0)
+{
+    <p class="text-body-secondary">@(Model.Filter == PtoRequestFilter.Pending ? "No requests are waiting for approval." : "No PTO has been requested yet.")</p>
+}
+
+@foreach (var request in Model.Requests)
+{
+    <div class="card mb-2">
+        <div class="card-body">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+                <div>
+                    <strong>@request.TechnicianName</strong>
+                    <span class="badge @request.Status.BadgeClass() ms-1">@request.Status</span>
+                    <div>@request.PeriodText</div>
+                    @if (request.Reason is not null)
+                    {
+                        <div class="small notes text-body-secondary">@request.Reason</div>
+                    }
+                    <div class="small text-body-secondary">
+                        Requested @request.RequestedAtUtc.ToString("MMM d, yyyy") (UTC)
+                        @if (request.ReviewedBy is not null)
+                        {
+                            <span>· @request.Status.ToString().ToLowerInvariant() by @request.ReviewedBy</span>
+                        }
+                    </div>
+                </div>
+                <div class="d-flex gap-2">
+                    @if (request.Status != PtoStatus.Approved)
+                    {
+                        <form asp-action="Approve" asp-route-id="@request.Id" asp-route-filter="@filter" method="post">
+                            <button type="submit" class="btn btn-sm btn-success">Approve</button>
+                        </form>
+                    }
+                    @if (request.Status != PtoStatus.Denied)
+                    {
+                        <form asp-action="Deny" asp-route-id="@request.Id" asp-route-filter="@filter" method="post"
+                              onsubmit="return confirm('@(request.Status == PtoStatus.Approved ? "Revoke this approved PTO?" : "Deny this PTO request?")');">
+                            <button type="submit" class="btn btn-sm btn-outline-danger">@(request.Status == PtoStatus.Approved ? "Revoke" : "Deny")</button>
+                        </form>
+                    }
+                </div>
+            </div>
+            @if (request.ConflictingJobs.Count > 0)
+            {
+                <div class="alert alert-warning small mt-2 mb-0">
+                    <strong>Scheduled during this time off:</strong>
+                    <ul class="mb-0">
+                        @foreach (var job in request.ConflictingJobs)
+                        {
+                            <li><a asp-controller="Jobs" asp-action="Details" asp-route-id="@job.JobId">@job.JobName</a> · @job.DatesText · @job.HoursText</li>
+                        }
+                    </ul>
+                </div>
+            }
+        </div>
+    </div>
+}

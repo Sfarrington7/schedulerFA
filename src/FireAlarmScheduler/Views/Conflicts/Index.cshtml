@@ -1,0 +1,74 @@
+@* Administrators' scheduling conflicts page: technicians on two overlapping jobs, and technicians assigned
+   to jobs during approved PTO, from today onward. Each row links to the jobs to fix them. *@
+@model ConflictsViewModel
+@{
+    ViewData["Title"] = "Scheduling conflicts";
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h1 class="h3 mb-0">Scheduling conflicts <small class="text-body-secondary fs-6">from @Model.From.ToString("MMM d, yyyy")</small></h1>
+    <a asp-controller="PtoRequests" asp-action="Index">PTO requests &rarr;</a>
+</div>
+
+@if (Model.DoubleBookings.Count == 0 && Model.PtoConflicts.Count == 0)
+{
+    <p class="alert alert-success">No conflicts. No technician is double-booked or scheduled during approved PTO.</p>
+}
+
+<div class="card mb-3">
+    <div class="card-header fw-semibold">Double-booked technicians <span class="badge text-bg-danger">@Model.DoubleBookings.Count</span></div>
+    @if (Model.DoubleBookings.Count == 0)
+    {
+        <div class="card-body text-body-secondary">None.</div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table mb-0 align-middle">
+                <thead>
+                    <tr><th>Technician</th><th>Dates</th><th>Job</th><th>Overlaps with</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in Model.DoubleBookings)
+                    {
+                        <tr>
+                            <td>@row.TechnicianName</td>
+                            <td class="text-nowrap">@row.Job.DatesText</td>
+                            <td><a asp-controller="Jobs" asp-action="Details" asp-route-id="@row.Job.JobId">@row.Job.JobName</a><div class="small text-body-secondary">@row.Job.HoursText</div></td>
+                            <td><a asp-controller="Jobs" asp-action="Details" asp-route-id="@row.OtherJob!.JobId">@row.OtherJob.JobName</a><div class="small text-body-secondary">@row.OtherJob.HoursText</div></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+<div class="card">
+    <div class="card-header fw-semibold">Scheduled during approved PTO <span class="badge text-bg-danger">@Model.PtoConflicts.Count</span></div>
+    @if (Model.PtoConflicts.Count == 0)
+    {
+        <div class="card-body text-body-secondary">None.</div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table mb-0 align-middle">
+                <thead>
+                    <tr><th>Technician</th><th>Dates</th><th>Job</th><th>Approved PTO</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in Model.PtoConflicts)
+                    {
+                        <tr>
+                            <td>@row.TechnicianName</td>
+                            <td class="text-nowrap">@row.Job.DatesText</td>
+                            <td><a asp-controller="Jobs" asp-action="Details" asp-route-id="@row.Job.JobId">@row.Job.JobName</a><div class="small text-body-secondary">@row.Job.HoursText</div></td>
+                            <td class="small">@row.Pto!.PeriodText</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>

@@ -192,6 +192,52 @@ namespace FireAlarmScheduler.Data.Migrations
                     b.ToTable("JobAssignments");
                 });
 
+            modelBuilder.Entity("FireAlarmScheduler.Entities.PtoRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly>("EndDate")
+                        .HasColumnType("date");
+
+                    b.Property<TimeOnly>("EndTime")
+                        .HasColumnType("time");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime>("RequestedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ReviewedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ReviewedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateOnly>("StartDate")
+                        .HasColumnType("date");
+
+                    b.Property<TimeOnly>("StartTime")
+                        .HasColumnType("time");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid>("TechnicianId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TechnicianId", "StartDate");
+
+                    b.ToTable("PtoRequests");
+                });
+
             modelBuilder.Entity("FireAlarmScheduler.Entities.Technician", b =>
                 {
                     b.Property<Guid>("Id")
@@ -404,6 +450,15 @@ namespace FireAlarmScheduler.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("FireAlarmScheduler.Entities.Technician", null)
+                        .WithMany()
+                        .HasForeignKey("TechnicianId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("FireAlarmScheduler.Entities.PtoRequest", b =>
+                {
                     b.HasOne("FireAlarmScheduler.Entities.Technician", null)
                         .WithMany()
                         .HasForeignKey("TechnicianId")
