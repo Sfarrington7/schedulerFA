@@ -1,5 +1,5 @@
-@* Recurring jobs list: each saved recurring job with its details, how many jobs it has, and its newest job's date,
-   plus buttons to start this round's job from it or remove it (its past jobs are kept). *@
+@* Recurring jobs list: each saved recurring job with its details, building list, how many jobs it has, and its newest
+   job's date, plus links to its page, buttons to start this round's job from it, or remove it (past jobs are kept). *@
 @model List<RecurringJobListItemViewModel>
 @{
     ViewData["Title"] = "Recurring jobs";
@@ -33,11 +33,12 @@ else
                     {
                         <tr>
                             <td>
-                                <strong>@item.Name</strong>
+                                <a asp-action="Details" asp-route-id="@item.Id" class="fw-semibold">@item.Name</a>
                                 @if (item.CustomerName is not null)
                                 {
                                     <div class="small text-body-secondary">@item.CustomerName</div>
                                 }
+                                <div class="small text-body-secondary">@(item.BuildingNames.Count == 0 ? "No buildings yet" : string.Join(", ", item.BuildingNames))</div>
                             </td>
                             <td class="d-none d-md-table-cell small">@item.Address@(item.SiteName is null ? "" : $" ({item.SiteName})")</td>
                             <td>@item.JobCount</td>

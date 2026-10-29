@@ -45,7 +45,7 @@ public class JobsController : Controller
 
     /// <summary>
     /// Shows the new-job form. With <paramref name="recurringJobId"/> the form starts from that recurring job's
-    /// saved details and previews the buildings that will be copied.
+    /// saved details and building list, which can still be changed for this job.
     /// </summary>
     public async Task<IActionResult> Create(Guid? recurringJobId)
     {
@@ -58,6 +58,9 @@ public class JobsController : Controller
             form.CustomerName = recurringJob.CustomerName;
             form.SiteName = recurringJob.SiteName;
             form.Address = recurringJob.Address;
+            form.Buildings = recurringJob.Buildings.OrderBy(b => b.SortOrder)
+                .Select(b => new BuildingRowModel { RecurringBuildingId = b.Id, Name = b.Name, Notes = b.Notes })
+                .ToList();
         }
 
         await FillChoicesAsync(form);
@@ -73,7 +76,7 @@ public class JobsController : Controller
             {
                 var job = await _jobService.CreateAsync(form.ToInput());
                 TempData["Message"] = job.Buildings.Count > 0
-                    ? $"Job created with {job.Buildings.Count} building(s) copied from the last {job.Name}. Upload this round's spreadsheets to each building."
+                    ? $"Job created with {job.Buildings.Count} building(s). Upload each building's spreadsheets below."
                     : "Job created. Add its buildings below.";
                 return RedirectToAction(nameof(Details), new { id = job.Id });
             }
@@ -150,7 +153,7 @@ public class JobsController : Controller
         return RedirectToAction(nameof(Index));
     }
 
-    /// <summary>Fills the form's technician checkboxes and recurring-job choices, and previews copied buildings.</summary>
+    /// <summary>Fills the form's technician checkboxes and recurring-job choices, and names a linked recurring job on edit.</summary>
     private async Task FillChoicesAsync(JobFormModel form)
     {
         form.AvailableTechnicians = (await _technicianService.GetAllAsync())
@@ -164,11 +167,6 @@ public class JobsController : Controller
                     string.Join(" · ", new[] { r.RecurringJob.CustomerName, r.RecurringJob.Address }.Where(x => !string.IsNullOrEmpty(x)))))
                 .ToList();
 
-            if (form.RecurringJobId is { } recurringJobId && await _recurringJobService.GetLatestJobAsync(recurringJobId) is { } latest)
-            {
-                form.BuildingsSourceText = $"{latest.Name} ({latest.StartDate:MMM d, yyyy})";
-                form.BuildingsToCopy = latest.Buildings.OrderBy(b => b.SortOrder).Select(b => b.Name).ToList();
-            }
         }
         else if (form.Id is { } jobId && (await _jobService.GetAsync(jobId))?.RecurringJobId is { } linkedId)
         {
