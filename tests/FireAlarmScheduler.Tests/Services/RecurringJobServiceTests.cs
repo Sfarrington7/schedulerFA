@@ -1,6 +1,6 @@
 // Purpose: Tests recurring jobs against the real database: saving a job as recurring, creating a job from one
 // (details linked, the series' building list used, files not copied), keeping saved details in step with the newest
-// job, the standing building list (buildings added to any job in a series reach the list and upcoming jobs; renames
+// job, series building names locked on the Create form, the standing building list (buildings added to any job in a series reach the list and upcoming jobs; renames
 // follow; removals from one job don't), duplicate names, and removing a recurring job without losing its jobs.
 // The clock is fixed to Nov 3, 2026, so 2027 jobs are "upcoming".
 using FireAlarmScheduler.Entities;
@@ -364,5 +364,46 @@ public class RecurringJobServiceTests : IDisposable
         Assert.Equal(3, (await Jobs.GetAsync(current.Id))!.Buildings.Count);
         var next = await Jobs.CreateAsync(NextYear(series.Id));
         Assert.Equal(["Building A", "Parking Garage"], next.Buildings.Select(b => b.Name));
+    }
+
+    [Fact]
+    public async Task CreateAsync_RowFromSeriesWithChangedName_KeepsSavedNameAndNotes()
+    {
+        var first = await CreateSeriesAsync();
+        var series = (await Recurring.GetAsync(first.RecurringJobId!.Value))!;
+        var buildingA = series.Buildings.Single(b => b.Name == "Building A");
+
+        var job = await Jobs.CreateAsync(NextYear(series.Id) with
+        {
+            Buildings = [new("Renamed Tower", "Notes for this round", buildingA.Id), new("Building D", null)]
+        });
+
+        Assert.Equal(["Building A", "Building D"], job.Buildings.Select(b => b.Name));
+        Assert.Equal("Notes for this round", job.Buildings[0].Notes);
+        var names = (await Recurring.GetAsync(series.Id))!.Buildings.Select(b => b.Name).ToList();
+        Assert.DoesNotContain("Renamed Tower", names);
+        Assert.Equal(["Building A", "Building B", "Parking Garage", "Building D"], names);
+    }
+
+    [Fact]
+    public async Task CreateAsync_RowPointingAtRemovedSeriesBuilding_ThrowsAndSavesNothing()
+    {
+        var first = await CreateSeriesAsync();
+
+        var ex = await Assert.ThrowsAsync<ValidationFailedException>(() => Jobs.CreateAsync(NextYear(first.RecurringJobId!.Value) with
+        {
+            Buildings = [new("Building A", null, Guid.NewGuid())]
+        }));
+
+        Assert.True(ex.Errors.ContainsKey("Buildings"));
+        Assert.Single(await Jobs.GetAllAsync());
+    }
+
+    [Fact]
+    public async Task CreateAsync_NewJobRowWithRecurringBuildingId_NameIsUsedAsTyped()
+    {
+        var job = await Jobs.CreateAsync(ServiceHarness.ValidJob() with { Buildings = [new("Main Tower", null, Guid.NewGuid())] });
+
+        Assert.Equal("Main Tower", Assert.Single(job.Buildings).Name);
     }
 }

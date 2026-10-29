@@ -59,7 +59,7 @@ public class JobsController : Controller
             form.SiteName = recurringJob.SiteName;
             form.Address = recurringJob.Address;
             form.Buildings = recurringJob.Buildings.OrderBy(b => b.SortOrder)
-                .Select(b => new BuildingRowModel { Name = b.Name, Notes = b.Notes })
+                .Select(b => new BuildingRowModel { RecurringBuildingId = b.Id, Name = b.Name, Notes = b.Notes })
                 .ToList();
         }
 

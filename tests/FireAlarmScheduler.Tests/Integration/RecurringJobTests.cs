@@ -1,6 +1,6 @@
 // Purpose: Tests recurring jobs and Create Job buildings over HTTP: building rows on the Create form, saving a new job
-// as recurring, starting a job from a recurring job (details and building rows prefilled, new buildings saved to the
-// series), editing a one-off job into a recurring one, the recurring job page's building list, Remove, and that
+// as recurring, starting a job from a recurring job (details and building rows prefilled with locked names, renames
+// ignored, new buildings saved to the series), editing a one-off job into a recurring one, the recurring job page's building list, Remove, and that
 // technicians can't reach these pages.
 using System.Net;
 using FireAlarmScheduler.Entities;
@@ -67,7 +67,8 @@ public class RecurringJobTests : IDisposable
         Assert.Contains("value=\"100 Main Street\"", html);
         Assert.Contains("value=\"Central Plaza LLC\"", html);
         Assert.Contains($"<option value=\"{series.RecurringJobId}\" selected=\"selected\">", html);
-        Assert.Contains("name=\"Buildings[0].Name\" value=\"Building A\"", html);
+        Assert.Contains("name=\"Buildings[0].Name\" value=\"Building A\" class=\"form-control\" readonly", html);
+        Assert.Contains("name=\"Buildings[0].RecurringBuildingId\"", html);
         Assert.Contains("name=\"Buildings[2].Name\" value=\"Parking Garage\"", html);
         Assert.Contains("name=\"Buildings[3].Name\" class=", html);
         Assert.DoesNotContain("name=\"SaveAsRecurring\"", html);
@@ -215,5 +216,23 @@ public class RecurringJobTests : IDisposable
             ("NewBuilding.Name", "Building C"), ("NewBuilding.Notes", ""));
 
         Assert.Contains("Building C", await client.GetStringAsync($"/RecurringJobs/Details/{series.RecurringJobId}"));
+    }
+
+    [Fact]
+    public async Task CreateForm_RenamedSeriesBuildingPosted_SavedWithOriginalName()
+    {
+        var series = await SeedSeriesAsync();
+        var recurring = (await Service<RecurringJobService>().GetAsync(series.RecurringJobId!.Value))!;
+        var buildingA = recurring.Buildings.Single(b => b.Name == "Building A");
+        var client = await _factory.SignInAsNewUserAsync(AppRoles.TeamLead);
+
+        await FormPoster.PostFormAsync(client, $"/Jobs/Create?recurringJobId={recurring.Id}", "/Jobs/Create",
+            JobFields("Central Plaza Annual Fire Alarm Inspection", "2027-11-01", "2027-11-05",
+                ("RecurringJobId", recurring.Id.ToString()),
+                ("Buildings[0].RecurringBuildingId", buildingA.Id.ToString()), ("Buildings[0].Name", "Sneaky Rename")));
+
+        var newJob = (await Service<JobService>().GetAllAsync()).Single(j => j.StartDate.Year == 2027);
+        Assert.Equal("Building A", Assert.Single(newJob.Buildings).Name);
+        Assert.DoesNotContain("Sneaky Rename", (await Service<RecurringJobService>().GetAsync(recurring.Id))!.Buildings.Select(b => b.Name));
     }
 }

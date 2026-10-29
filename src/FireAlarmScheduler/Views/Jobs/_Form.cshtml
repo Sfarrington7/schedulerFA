@@ -35,7 +35,7 @@
                 }
                 else
                 {
-                    <div class="form-text">Its details and building list are filled in below. Changes to the buildings here apply to this job; buildings you add are also saved to the recurring job for next time.</div>
+                    <div class="form-text">Its details and building list are filled in below. The recurring job's buildings can't be renamed here, but you can add notes or remove one for this round. Buildings you add are also saved to the recurring job for next time.</div>
                 }
             </div>
         </div>
@@ -86,9 +86,20 @@
                 @for (var i = 0; i < Model.Buildings.Count + 1; i++)
                 {
                     var row = i < Model.Buildings.Count ? Model.Buildings[i] : new BuildingRowModel();
+                    var fromSeries = Model.RecurringJobId is not null && row.RecurringBuildingId is not null;
                     <div class="row g-2 mb-2 building-row">
                         <div class="col-sm-4">
-                            <input name="Buildings[@i].Name" value="@row.Name" class="form-control" placeholder="Building name, e.g. Building A" aria-label="Building name" maxlength="100" />
+                            @if (fromSeries)
+                            {
+                                @* Names of the recurring job's buildings are fixed here; the server uses the saved name. *@
+                                <input type="hidden" name="Buildings[@i].RecurringBuildingId" value="@row.RecurringBuildingId" />
+                                <input name="Buildings[@i].Name" value="@row.Name" class="form-control" readonly
+                                       title="Buildings from the recurring job can't be renamed here" aria-label="Building name (from recurring job)" />
+                            }
+                            else
+                            {
+                                <input name="Buildings[@i].Name" value="@row.Name" class="form-control" placeholder="Building name, e.g. Building A" aria-label="Building name" maxlength="100" />
+                            }
                         </div>
                         <div class="col">
                             <input name="Buildings[@i].Notes" value="@row.Notes" class="form-control" placeholder="Notes (optional)" aria-label="Building notes" maxlength="2000" />

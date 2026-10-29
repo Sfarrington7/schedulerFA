@@ -67,7 +67,7 @@ public class JobFormModel
     public JobInput ToInput() => new(Name, CustomerName, SiteName, Address, StartDate, EndDate,
         StartTime, EndTime, Status, Notes, AssignedTechnicianIds,
         IsNew ? RecurringJobId : null, SaveAsRecurring && (!IsNew || RecurringJobId is null),
-        IsNew ? Buildings.Select(b => new BuildingInput(b.Name, b.Notes)).ToList() : null);
+        IsNew ? Buildings.Select(b => new BuildingInput(b.Name, b.Notes, b.RecurringBuildingId)).ToList() : null);
 
     public static JobFormModel FromEntity(Job job) => new()
     {
@@ -86,9 +86,14 @@ public class JobFormModel
     };
 }
 
-/// <summary>One building row on the Create Job form; rows left blank are ignored.</summary>
+/// <summary>
+/// One building row on the Create Job form; rows left blank are ignored. Rows from a recurring job's building list
+/// carry <see cref="RecurringBuildingId"/> and show their name read-only.
+/// </summary>
 public class BuildingRowModel
 {
+    public Guid? RecurringBuildingId { get; set; }
+
     [StringLength(100)]
     public string? Name { get; set; }
 

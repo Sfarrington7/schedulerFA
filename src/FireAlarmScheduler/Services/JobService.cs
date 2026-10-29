@@ -54,16 +54,19 @@ public class JobService
     {
         var job = new Job { Id = Guid.NewGuid() };
         await ApplyInputAsync(job, input);
-        var buildings = ValidateBuildings(input.Buildings);
 
-        RecurringJob? created = null;
+        RecurringJob? recurringJob = null;
         if (input.RecurringJobId is { } recurringJobId)
         {
-            var recurringJob = await _recurringJobs.GetAsync(recurringJobId)
+            recurringJob = await _recurringJobs.GetAsync(recurringJobId)
                 ?? throw new ValidationFailedException("RecurringJobId", "That recurring job no longer exists. Choose another or start a new job.");
             job.RecurringJobId = recurringJobId;
-            buildings ??= recurringJob.Buildings.OrderBy(b => b.SortOrder).Select(b => (b.Name, b.Notes)).ToList();
         }
+
+        var buildings = ValidateBuildings(LockRecurringBuildingNames(input.Buildings, recurringJob))
+            ?? recurringJob?.Buildings.OrderBy(b => b.SortOrder).Select(b => (b.Name, b.Notes)).ToList();
+
+        RecurringJob? created = null;
 
         job.Buildings = (buildings ?? [])
             .Select((b, i) => new Building { Id = Guid.NewGuid(), JobId = job.Id, Name = b.Name, Notes = b.Notes, SortOrder = i })
@@ -281,6 +284,32 @@ public class JobService
                 return true;
             });
         }
+    }
+
+    /// <summary>
+    /// Rows that came from the recurring job's building list can't be renamed on the Create form: each such row takes
+    /// the saved name of its recurring building, whatever name was posted. Throws if a row points at a building that
+    /// is no longer on the list. Rows without a recurring building, or for a job not from a recurring job, are unchanged.
+    /// </summary>
+    private static IReadOnlyList<BuildingInput>? LockRecurringBuildingNames(IReadOnlyList<BuildingInput>? rows, RecurringJob? recurringJob)
+    {
+        if (rows is null || recurringJob is null)
+        {
+            return rows;
+        }
+
+        return rows.Select(row =>
+        {
+            if (row.RecurringBuildingId is not { } id)
+            {
+                return row;
+            }
+
+            var saved = recurringJob.Buildings.FirstOrDefault(b => b.Id == id)
+                ?? throw new ValidationFailedException("Buildings",
+                    "A building from the recurring job's list was removed while you were editing. Reload the form and try again.");
+            return row with { Name = saved.Name };
+        }).ToList();
     }
 
     /// <summary>

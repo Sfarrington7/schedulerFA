@@ -27,7 +27,11 @@
             addButton.addEventListener('click', () => {
                 const rows = fieldset.querySelectorAll('.building-row');
                 const copy = rows[rows.length - 1].cloneNode(true);
-                copy.querySelectorAll('input').forEach(input => input.value = '');
+                // A new row is always a new, nameable building, even if it was copied from a locked recurring row.
+                copy.querySelectorAll('input[name$=".RecurringBuildingId"]').forEach(input => input.remove());
+                copy.querySelectorAll('input').forEach(input => { input.value = ''; input.readOnly = false; });
+                copy.querySelector('input').placeholder = 'Building name, e.g. Building A';
+                copy.querySelector('input').removeAttribute('title');
                 addButton.before(copy);
                 renumber();
                 copy.querySelector('input').focus();
@@ -39,7 +43,8 @@
                 if (fieldset.querySelectorAll('.building-row').length > 1) {
                     row.remove();
                 } else {
-                    row.querySelectorAll('input').forEach(input => input.value = '');
+                    row.querySelectorAll('input[name$=".RecurringBuildingId"]').forEach(input => input.remove());
+                    row.querySelectorAll('input').forEach(input => { input.value = ''; input.readOnly = false; });
                 }
                 renumber();
             });

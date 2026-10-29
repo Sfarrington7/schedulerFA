@@ -21,5 +21,8 @@ public record JobInput(
     bool SaveAsRecurring = false,
     IReadOnlyList<BuildingInput>? Buildings = null);
 
-/// <summary>A building entered on the Create Job form. Rows with a blank name are ignored.</summary>
-public record BuildingInput(string? Name, string? Notes);
+/// <summary>
+/// A building entered on the Create Job form. Rows with a blank name are ignored. <paramref name="RecurringBuildingId"/>
+/// marks a row that came from the recurring job's building list; its name is fixed to that building's saved name.
+/// </summary>
+public record BuildingInput(string? Name, string? Notes, Guid? RecurringBuildingId = null);
