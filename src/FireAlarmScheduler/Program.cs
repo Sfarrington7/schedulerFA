@@ -60,7 +60,9 @@ builder.Services.AddSingleton<IFileStorage>(services =>
 builder.Services.AddSingleton<ITechnicianRepository, EfTechnicianRepository>();
 builder.Services.AddSingleton<IJobRepository, EfJobRepository>();
 builder.Services.AddSingleton<IPtoRepository, EfPtoRepository>();
+builder.Services.AddSingleton<IRecurringJobRepository, EfRecurringJobRepository>();
 builder.Services.AddScoped<TechnicianService>();
+builder.Services.AddScoped<RecurringJobService>();
 builder.Services.AddScoped<JobService>();
 builder.Services.AddScoped<BuildingFileService>();
 builder.Services.AddScoped<UserAdministrationService>();

@@ -31,6 +31,7 @@ public sealed class ServiceHarness
         services.AddSingleton<ITechnicianRepository, EfTechnicianRepository>();
         services.AddSingleton<IJobRepository, EfJobRepository>();
         services.AddSingleton<IPtoRepository, EfPtoRepository>();
+        services.AddSingleton<IRecurringJobRepository, EfRecurringJobRepository>();
         services.AddScoped<UserAdministrationService>();
 
         var provider = services.BuildServiceProvider();
@@ -41,12 +42,14 @@ public sealed class ServiceHarness
         Technicians = provider.GetRequiredService<ITechnicianRepository>();
         Jobs = provider.GetRequiredService<IJobRepository>();
         PtoRequests = provider.GetRequiredService<IPtoRepository>();
+        RecurringJobRepository = provider.GetRequiredService<IRecurringJobRepository>();
         FileStorage = new LocalFileStorage(UploadsDirectory);
         UserManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         UserAdmin = scope.ServiceProvider.GetRequiredService<UserAdministrationService>();
 
         TechnicianService = new TechnicianService(Technicians);
-        JobService = new JobService(Jobs, Technicians, FileStorage);
+        RecurringJobService = new RecurringJobService(RecurringJobRepository, Jobs);
+        JobService = new JobService(Jobs, Technicians, FileStorage, RecurringJobService);
         PtoService = new PtoService(PtoRequests, Technicians, new FixedTimeProvider(Now));
         ConflictService = new ScheduleConflictService(Jobs, PtoRequests);
         FileService = new BuildingFileService(Jobs, FileStorage,
@@ -58,6 +61,8 @@ public sealed class ServiceHarness
     public ITechnicianRepository Technicians { get; }
     public IJobRepository Jobs { get; }
     public IPtoRepository PtoRequests { get; }
+    public IRecurringJobRepository RecurringJobRepository { get; }
+    public RecurringJobService RecurringJobService { get; }
     public IFileStorage FileStorage { get; }
     public UserManager<ApplicationUser> UserManager { get; }
     public UserAdministrationService UserAdmin { get; }

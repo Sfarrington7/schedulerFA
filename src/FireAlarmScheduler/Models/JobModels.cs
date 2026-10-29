@@ -1,4 +1,5 @@
-// Purpose: View and form models for jobs, their buildings, and uploaded files.
+// Purpose: View and form models for jobs (including the recurring-job choice), their buildings, uploaded files,
+// and the Recurring jobs page.
 using System.ComponentModel.DataAnnotations;
 using FireAlarmScheduler.Entities;
 using FireAlarmScheduler.Services;
@@ -44,8 +45,29 @@ public class JobFormModel
     /// <summary>Choices for the technician checkboxes; filled by the controller, not posted back.</summary>
     public List<TechnicianOption> AvailableTechnicians { get; set; } = [];
 
+    /// <summary>On create: the recurring job this new job starts from, or null for a brand-new job.</summary>
+    [Display(Name = "Job / project")]
+    public Guid? RecurringJobId { get; set; }
+
+    /// <summary>Save this job's details as a new recurring job (new jobs, or one-off jobs being edited).</summary>
+    [Display(Name = "Save as a recurring job")]
+    public bool SaveAsRecurring { get; set; }
+
+    /// <summary>Recurring jobs to choose from on create; filled by the controller, not posted back.</summary>
+    public List<RecurringJobOption> AvailableRecurringJobs { get; set; } = [];
+
+    /// <summary>On edit: the name of the recurring job this job belongs to, if any; filled by the controller.</summary>
+    public string? LinkedRecurringJobName { get; set; }
+
+    /// <summary>On create from a recurring job: the job whose buildings will be copied, and those buildings' names.</summary>
+    public string? BuildingsSourceText { get; set; }
+    public List<string> BuildingsToCopy { get; set; } = [];
+
+    public bool IsNew => Id is null;
+
     public JobInput ToInput() => new(Name, CustomerName, SiteName, Address, StartDate, EndDate,
-        StartTime, EndTime, Status, Notes, AssignedTechnicianIds);
+        StartTime, EndTime, Status, Notes, AssignedTechnicianIds,
+        IsNew ? RecurringJobId : null, SaveAsRecurring && (!IsNew || RecurringJobId is null));
 
     public static JobFormModel FromEntity(Job job) => new()
     {
@@ -64,6 +86,13 @@ public class JobFormModel
     };
 }
 
+/// <summary>A recurring job in the Create Job picker.</summary>
+public record RecurringJobOption(Guid Id, string Name, string Detail);
+
+/// <summary>A row on the Recurring jobs page.</summary>
+public record RecurringJobListItemViewModel(Guid Id, string Name, string? CustomerName, string? SiteName, string Address,
+    int JobCount, DateOnly? LatestStartDate);
+
 public class JobSummaryViewModel
 {
     public Guid Id { get; init; }
@@ -78,6 +107,7 @@ public class JobSummaryViewModel
     public JobStatus Status { get; init; }
     public List<TechnicianOption> Technicians { get; init; } = [];
     public List<string> BuildingNames { get; init; } = [];
+    public bool IsRecurring { get; init; }
 
     public string DateRangeText => StartDate == EndDate
         ? StartDate.ToString("ddd, MMM d, yyyy")
@@ -107,7 +137,8 @@ public class JobSummaryViewModel
             .Where(technicians.ContainsKey)
             .Select(id => new TechnicianOption(id, technicians[id].FullName))
             .ToList(),
-        BuildingNames = job.Buildings.Select(b => b.Name).ToList()
+        BuildingNames = job.Buildings.Select(b => b.Name).ToList(),
+        IsRecurring = job.RecurringJobId is not null
     };
 }
 

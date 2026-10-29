@@ -155,6 +155,9 @@ namespace FireAlarmScheduler.Data.Migrations
                         .HasMaxLength(4000)
                         .HasColumnType("nvarchar(4000)");
 
+                    b.Property<Guid?>("RecurringJobId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("SiteName")
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
@@ -171,6 +174,8 @@ namespace FireAlarmScheduler.Data.Migrations
                         .HasColumnType("nvarchar(20)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("RecurringJobId");
 
                     b.HasIndex("StartDate");
 
@@ -236,6 +241,34 @@ namespace FireAlarmScheduler.Data.Migrations
                     b.HasIndex("TechnicianId", "StartDate");
 
                     b.ToTable("PtoRequests");
+                });
+
+            modelBuilder.Entity("FireAlarmScheduler.Entities.RecurringJob", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Address")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("CustomerName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("SiteName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("RecurringJobs");
                 });
 
             modelBuilder.Entity("FireAlarmScheduler.Entities.Technician", b =>
@@ -440,6 +473,14 @@ namespace FireAlarmScheduler.Data.Migrations
                         .HasForeignKey("JobId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("FireAlarmScheduler.Entities.Job", b =>
+                {
+                    b.HasOne("FireAlarmScheduler.Entities.RecurringJob", null)
+                        .WithMany()
+                        .HasForeignKey("RecurringJobId")
+                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("FireAlarmScheduler.Entities.JobAssignment", b =>

@@ -1,5 +1,5 @@
-// Purpose: Job scheduling rules: create, edit, and delete jobs, assign technicians,
-// manage a job's buildings, and answer date-range schedule queries.
+// Purpose: Job scheduling rules: create, edit, and delete jobs, assign technicians, link jobs to recurring
+// jobs (copying the series' building list), manage a job's buildings, and answer date-range schedule queries.
 using FireAlarmScheduler.Entities;
 
 namespace FireAlarmScheduler.Services;
@@ -9,12 +9,14 @@ public class JobService
     private readonly IJobRepository _jobs;
     private readonly ITechnicianRepository _technicians;
     private readonly IFileStorage _fileStorage;
+    private readonly RecurringJobService _recurringJobs;
 
-    public JobService(IJobRepository jobs, ITechnicianRepository technicians, IFileStorage fileStorage)
+    public JobService(IJobRepository jobs, ITechnicianRepository technicians, IFileStorage fileStorage, RecurringJobService recurringJobs)
     {
         _jobs = jobs;
         _technicians = technicians;
         _fileStorage = fileStorage;
+        _recurringJobs = recurringJobs;
     }
 
     /// <summary>Returns all jobs ordered by start date and time.</summary>
@@ -38,23 +40,75 @@ public class JobService
         Sort((await _jobs.GetAllAsync())
             .Where(j => j.OverlapsRange(from, to) && j.AssignedTechnicianIds.Any(technicianIds.Contains)));
 
+    /// <summary>
+    /// Creates a job. With <see cref="JobInput.RecurringJobId"/> it joins that recurring job and starts with a copy
+    /// of the building list (names and notes, not files) from the newest job in the series; with
+    /// <see cref="JobInput.SaveAsRecurring"/> its details are saved as a new recurring job.
+    /// </summary>
     public async Task<Job> CreateAsync(JobInput input)
     {
         var job = new Job { Id = Guid.NewGuid() };
         await ApplyInputAsync(job, input);
-        await _jobs.AddAsync(job);
+
+        RecurringJob? created = null;
+        if (input.RecurringJobId is { } recurringJobId)
+        {
+            if (await _recurringJobs.GetAsync(recurringJobId) is null)
+            {
+                throw new ValidationFailedException("RecurringJobId", "That recurring job no longer exists. Choose another or start a new job.");
+            }
+
+            job.RecurringJobId = recurringJobId;
+            CopyBuildings(await _recurringJobs.GetLatestJobAsync(recurringJobId), job);
+        }
+        else if (input.SaveAsRecurring)
+        {
+            created = await _recurringJobs.CreateFromAsync(job);
+            job.RecurringJobId = created.Id;
+        }
+
+        try
+        {
+            await _jobs.AddAsync(job);
+        }
+        catch when (created is not null)
+        {
+            // Don't leave a recurring job behind with no job if saving the job itself failed.
+            await _recurringJobs.DeleteAsync(created.Id);
+            throw;
+        }
+
+        await _recurringJobs.SyncFromJobAsync(job);
         return job;
     }
 
     /// <summary>Updates the job's details and assignments, keeping its buildings and files. Returns false if not found.</summary>
+    /// <remarks>
+    /// The recurring link can't be changed here except that a one-off job can be saved as a new recurring job
+    /// (<see cref="JobInput.SaveAsRecurring"/>). If this is the newest job in its series, the recurring job's
+    /// details are updated to match.
+    /// </remarks>
     public async Task<bool> UpdateAsync(Guid id, JobInput input)
     {
         // Validate against a scratch copy first so invalid input never reaches storage.
-        var validated = new Job();
+        var validated = new Job { Id = id };
         await ApplyInputAsync(validated, input);
 
-        return await _jobs.UpdateAsync(id, job =>
+        var existing = await _jobs.GetByIdAsync(id);
+        if (existing is null)
         {
+            return false;
+        }
+
+        validated.RecurringJobId = existing.RecurringJobId;
+        if (validated.RecurringJobId is null && input.SaveAsRecurring)
+        {
+            validated.RecurringJobId = (await _recurringJobs.CreateFromAsync(validated)).Id;
+        }
+
+        var updated = await _jobs.UpdateAsync(id, job =>
+        {
+            job.RecurringJobId = validated.RecurringJobId;
             job.Name = validated.Name;
             job.CustomerName = validated.CustomerName;
             job.SiteName = validated.SiteName;
@@ -68,6 +122,27 @@ public class JobService
             job.SetAssignedTechnicians(validated.AssignedTechnicianIds);
             return true;
         });
+
+        if (updated)
+        {
+            await _recurringJobs.SyncFromJobAsync(validated);
+        }
+
+        return updated;
+    }
+
+    /// <summary>Gives <paramref name="job"/> new buildings with the same names, notes, and order as <paramref name="source"/>'s.</summary>
+    private static void CopyBuildings(Job? source, Job job)
+    {
+        if (source is null)
+        {
+            return;
+        }
+
+        job.Buildings = source.Buildings
+            .OrderBy(b => b.SortOrder)
+            .Select((b, i) => new Building { Id = Guid.NewGuid(), JobId = job.Id, Name = b.Name, Notes = b.Notes, SortOrder = i })
+            .ToList();
     }
 
     /// <summary>Deletes the job and every spreadsheet stored for its buildings. Returns false if not found.</summary>

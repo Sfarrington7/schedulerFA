@@ -6,7 +6,10 @@
 
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h1 class="h3 mb-0">Jobs</h1>
-    <a class="btn btn-primary" asp-action="Create">Create job</a>
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-secondary" asp-controller="RecurringJobs" asp-action="Index">Recurring jobs</a>
+        <a class="btn btn-primary" asp-action="Create">Create job</a>
+    </div>
 </div>
 
 @if (Model.Count == 0)
@@ -33,6 +36,10 @@ else
                         <tr>
                             <td>
                                 <a asp-action="Details" asp-route-id="@job.Id" class="fw-semibold">@job.Name</a>
+                                @if (job.IsRecurring)
+                                {
+                                    <span class="badge text-bg-info">Recurring</span>
+                                }
                                 @if (job.CustomerName is not null)
                                 {
                                     <div class="small text-body-secondary">@job.CustomerName</div>

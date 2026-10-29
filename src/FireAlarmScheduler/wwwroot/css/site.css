@@ -231,3 +231,9 @@ body {
 .conflict-table td {
   overflow-wrap: anywhere;
 }
+
+/* Create Job: the recurring-job picker stands out as the first choice on the form. */
+.recurring-picker {
+  background-color: #eef4fb;
+  border: 1px solid #cfe0f3;
+}

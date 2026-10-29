@@ -1,9 +1,70 @@
-@* Shared create/edit form for a job: details, schedule, status, notes, and technician assignment. *@
+@* Shared create/edit form for a job: recurring-job choice, details, schedule, status, notes, and technician
+   assignment. On create, picking a recurring job reloads the form with its saved details and building preview. *@
 @model JobFormModel
 <div asp-validation-summary="ModelOnly" class="text-danger"></div>
 <div class="row g-3">
+    @if (Model.IsNew)
+    {
+        <div class="col-12">
+            <div class="recurring-picker p-3 rounded">
+                <label asp-for="RecurringJobId" class="form-label fw-semibold"></label>
+                <div class="input-group">
+                    <select asp-for="RecurringJobId" class="form-select" data-load-url="@Url.Action("Create")"
+                            onchange="location = this.dataset.loadUrl + (this.value ? '?recurringJobId=' + this.value : '')">
+                        <option value="">New job</option>
+                        @if (Model.AvailableRecurringJobs.Count > 0)
+                        {
+                            <optgroup label="Recurring jobs">
+                                @foreach (var option in Model.AvailableRecurringJobs)
+                                {
+                                    <option value="@option.Id" selected="@(option.Id == Model.RecurringJobId)">@option.Name@(option.Detail.Length > 0 ? $" — {option.Detail}" : "")</option>
+                                }
+                            </optgroup>
+                        }
+                    </select>
+                    <noscript><button type="submit" class="btn btn-outline-secondary" formaction="@Url.Action("Create")" formmethod="get">Load</button></noscript>
+                </div>
+                <span asp-validation-for="RecurringJobId" class="text-danger small"></span>
+                @if (Model.RecurringJobId is null)
+                {
+                    <div class="form-check mt-2">
+                        <input asp-for="SaveAsRecurring" class="form-check-input" />
+                        <label asp-for="SaveAsRecurring" class="form-check-label"></label>
+                        <div class="form-text mt-0">Keeps this job's name, customer, site, and address, and its building list, for next time.</div>
+                    </div>
+                }
+                else if (Model.BuildingsToCopy.Count > 0)
+                {
+                    <div class="form-text">
+                        Buildings copied from <strong>@Model.BuildingsSourceText</strong>: @string.Join(", ", Model.BuildingsToCopy).
+                        Spreadsheets aren't copied; upload this round's files after saving.
+                    </div>
+                }
+                else
+                {
+                    <div class="form-text">No earlier job in this series has buildings yet. Add them after saving.</div>
+                }
+            </div>
+        </div>
+    }
+    else if (Model.LinkedRecurringJobName is not null)
+    {
+        <div class="col-12">
+            <div class="form-text"><span class="badge text-bg-info">Recurring</span> Part of <strong>@Model.LinkedRecurringJobName</strong>. If this is the newest job in the series, your changes to its name, customer, site, and address are saved for next time.</div>
+        </div>
+    }
+    else
+    {
+        <div class="col-12">
+            <div class="form-check">
+                <input asp-for="SaveAsRecurring" class="form-check-input" />
+                <label asp-for="SaveAsRecurring" class="form-check-label"></label>
+                <div class="form-text mt-0">Reuse this job's details and building list when the job comes around again.</div>
+            </div>
+        </div>
+    }
     <div class="col-md-6">
-        <label asp-for="Name" class="form-label"></label>
+        <label asp-for="Name" class="form-label">Job / project name</label>
         <input asp-for="Name" class="form-control" />
         <span asp-validation-for="Name" class="text-danger small"></span>
     </div>
