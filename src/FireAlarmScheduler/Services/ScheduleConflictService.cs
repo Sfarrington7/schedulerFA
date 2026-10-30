@@ -1,5 +1,6 @@
 // Purpose: Finds scheduling conflicts: a technician on two jobs whose daily hours overlap on the same day,
-// and a technician assigned to a job during their PTO. Completed jobs and past days are ignored.
+// and a technician assigned to a job during their PTO. Completed jobs and past days are ignored. Also checks which
+// technicians would conflict if assigned to a job being created or edited.
 using FireAlarmScheduler.Entities;
 
 namespace FireAlarmScheduler.Services;
@@ -16,6 +17,12 @@ public enum ConflictKind
 /// </summary>
 public record ScheduleConflict(
     ConflictKind Kind, Guid TechnicianId, Job Job, DateOnly FirstDate, DateOnly LastDate, Job? OtherJob, PtoRequest? Pto);
+
+/// <summary>The days and daily hours of a job being created or edited; <see cref="JobId"/> is null for a new job.</summary>
+public record JobSlot(Guid? JobId, DateOnly StartDate, DateOnly EndDate, TimeOnly StartTime, TimeOnly EndTime)
+{
+    public bool IsValid => EndDate >= StartDate && EndTime > StartTime;
+}
 
 public class ScheduleConflictService
 {
@@ -43,6 +50,45 @@ public class ScheduleConflictService
         return FindPtoConflicts(jobs, requests, from)
             .GroupBy(c => c.Pto!.Id)
             .ToDictionary(g => g.Key, g => g.ToList());
+    }
+
+    /// <summary>
+    /// The conflicts each of <paramref name="technicianIds"/> would have if assigned to a job in <paramref name="slot"/>:
+    /// other active jobs whose hours overlap, and approved PTO. The job being edited is left out so it doesn't clash
+    /// with itself. Technicians who are free have no entries.
+    /// </summary>
+    public async Task<ILookup<Guid, ScheduleConflict>> FindAssignmentConflictsAsync(JobSlot slot, IEnumerable<Guid> technicianIds)
+    {
+        var jobs = await _jobs.GetAllAsync();
+        var approved = (await _pto.GetAllAsync()).Where(p => p.Status == PtoStatus.Approved);
+        return FindAssignmentConflicts(slot, technicianIds, jobs, approved).ToLookup(c => c.TechnicianId);
+    }
+
+    /// <summary>
+    /// Conflicts for a job that would run in <paramref name="slot"/> with these technicians, using the same rules as the
+    /// Conflicts page. Each result's <see cref="ScheduleConflict.Job"/> is the proposed job; for double bookings
+    /// <see cref="ScheduleConflict.OtherJob"/> is the existing job. An invalid slot (end before start) has no conflicts.
+    /// </summary>
+    public static List<ScheduleConflict> FindAssignmentConflicts(JobSlot slot, IEnumerable<Guid> technicianIds,
+        IReadOnlyList<Job> jobs, IEnumerable<PtoRequest> approvedPto)
+    {
+        if (!slot.IsValid)
+        {
+            return [];
+        }
+
+        var proposed = new Job
+        {
+            Id = slot.JobId ?? Guid.NewGuid(), StartDate = slot.StartDate, EndDate = slot.EndDate,
+            StartTime = slot.StartTime, EndTime = slot.EndTime
+        };
+        proposed.SetAssignedTechnicians(technicianIds);
+
+        var overlapping = jobs.Where(j => j.Id != proposed.Id && j.OverlapsRange(proposed.StartDate, proposed.EndDate));
+        var doubleBookings = FindDoubleBookings([proposed, .. overlapping], proposed.StartDate)
+            .Where(c => c.Job.Id == proposed.Id || c.OtherJob!.Id == proposed.Id)
+            .Select(c => c.Job.Id == proposed.Id ? c : c with { Job = proposed, OtherJob = c.Job });
+        return [.. doubleBookings, .. FindPtoConflicts([proposed], approvedPto, proposed.StartDate)];
     }
 
     /// <summary>

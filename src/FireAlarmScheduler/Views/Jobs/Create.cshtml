@@ -1,4 +1,4 @@
-@* Create a new job. Buildings are added on the job page after saving. *@
+@* Create a new job, optionally starting from a recurring job, with its buildings and assigned technicians. *@
 @model JobFormModel
 @{
     ViewData["Title"] = "Create job";
@@ -15,6 +15,7 @@
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <script src="~/js/technician-picker.js" asp-append-version="true"></script>
     <script>
         // Building rows: "+ Add building" copies an empty row; "×" removes one. Before submitting, rows are renumbered
         // so the server receives Buildings[0..n] with no gaps.

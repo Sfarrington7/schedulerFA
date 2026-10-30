@@ -1,4 +1,4 @@
-@* Edit a job's details, schedule, status, and assigned technicians. *@
+@* Edit a job's details, schedule, status, and assigned technicians (flagging any scheduling conflicts). *@
 @model JobFormModel
 @{
     ViewData["Title"] = "Edit job";
@@ -15,4 +15,5 @@
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <script src="~/js/technician-picker.js" asp-append-version="true"></script>
 }

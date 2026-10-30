@@ -1,5 +1,5 @@
 // Purpose: Job pages for team leads and administrators: list, view, create (new or from a recurring job), edit, and
-// delete jobs and assign technicians.
+// delete jobs and assign technicians, showing which technicians would have a scheduling conflict.
 using FireAlarmScheduler.Models;
 using FireAlarmScheduler.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -13,14 +13,16 @@ public class JobsController : Controller
     private readonly JobService _jobService;
     private readonly TechnicianService _technicianService;
     private readonly RecurringJobService _recurringJobService;
+    private readonly ScheduleConflictService _conflictService;
     private readonly TimeProvider _timeProvider;
 
     public JobsController(JobService jobService, TechnicianService technicianService, RecurringJobService recurringJobService,
-        TimeProvider timeProvider)
+        ScheduleConflictService conflictService, TimeProvider timeProvider)
     {
         _jobService = jobService;
         _technicianService = technicianService;
         _recurringJobService = recurringJobService;
+        _conflictService = conflictService;
         _timeProvider = timeProvider;
     }
 
@@ -153,12 +155,38 @@ public class JobsController : Controller
         return RedirectToAction(nameof(Index));
     }
 
-    /// <summary>Fills the form's technician checkboxes and recurring-job choices, and names a linked recurring job on edit.</summary>
+    /// <summary>
+    /// Each technician's conflicts for a job on these days and hours, for the job form's script to refresh the picker
+    /// when the dates or times change. <paramref name="jobId"/> is the job being edited, if any.
+    /// </summary>
+    [HttpGet]
+    public async Task<IActionResult> TechnicianAvailability(DateOnly startDate, DateOnly endDate, TimeOnly startTime,
+        TimeOnly endTime, Guid? jobId)
+    {
+        var slot = new JobSlot(jobId, startDate, endDate, startTime, endTime);
+        if (!ModelState.IsValid || !slot.IsValid)
+        {
+            return BadRequest();
+        }
+
+        var choices = await GetTechnicianChoicesAsync(slot);
+        return Json(choices.Select(c => new TechnicianAvailability(c.Id, c.Conflicts)));
+    }
+
+    private async Task<List<TechnicianChoice>> GetTechnicianChoicesAsync(JobSlot slot)
+    {
+        var technicians = await _technicianService.GetAllAsync();
+        var conflicts = await _conflictService.FindAssignmentConflictsAsync(slot, technicians.Select(t => t.Id));
+        return technicians
+            .Select(t => new TechnicianChoice(t.Id, t.FullName, conflicts[t.Id].Select(TechnicianChoice.Describe).Distinct().ToList()))
+            .ToList();
+    }
+
+    /// <summary>Fills the form's technician picker (with conflicts at the form's times) and recurring-job choices, and names a linked recurring job on edit.</summary>
     private async Task FillChoicesAsync(JobFormModel form)
     {
-        form.AvailableTechnicians = (await _technicianService.GetAllAsync())
-            .Select(t => new TechnicianOption(t.Id, t.FullName))
-            .ToList();
+        form.AvailabilityChecked = form.Slot.IsValid;
+        form.AvailableTechnicians = await GetTechnicianChoicesAsync(form.Slot);
 
         if (form.IsNew)
         {

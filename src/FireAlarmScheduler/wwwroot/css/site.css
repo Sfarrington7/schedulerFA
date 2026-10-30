@@ -243,3 +243,71 @@ body {
   background-color: #e9ecef;
   cursor: not-allowed;
 }
+
+/* Job form: technician picker dropdown; each technician is marked Free, Conflict, or Not checked. */
+#technician-picker-toggle {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.technician-picker .dropdown-menu {
+  width: 100%;
+  max-height: 24rem;
+  overflow-y: auto;
+}
+
+.technician-choice {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  white-space: normal;
+  cursor: pointer;
+  border-left: 3px solid transparent;
+  border-radius: 0.25rem;
+}
+
+.technician-choice:active {
+  color: inherit;
+  background-color: var(--bs-dropdown-link-hover-bg);
+}
+
+.technician-choice:has(input:checked) {
+  background-color: #eef4fb;
+}
+
+.technician-choice .form-check-input {
+  flex-shrink: 0;
+  margin-top: 0.2rem;
+}
+
+.technician-choice-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  column-gap: 0.5rem;
+  align-items: center;
+}
+
+.technician-conflicts {
+  grid-column: 1 / -1;
+  font-size: 0.8rem;
+  color: #7a4a00;
+}
+
+.technician-choice[data-status="free"] .technician-status {
+  background-color: #198754;
+}
+
+.technician-choice[data-status="conflict"] {
+  border-left-color: #ffc107;
+}
+
+.technician-choice[data-status="conflict"] .technician-status {
+  background-color: #ffc107;
+  color: #000;
+}
+
+.technician-choice[data-status="unknown"] .technician-status {
+  background-color: #6c757d;
+}

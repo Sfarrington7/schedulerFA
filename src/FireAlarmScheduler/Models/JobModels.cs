@@ -1,5 +1,5 @@
-// Purpose: View and form models for jobs (including the recurring-job choice), their buildings, uploaded files,
-// and the Recurring jobs page.
+// Purpose: View and form models for jobs (including the recurring-job choice and the technician picker with each
+// technician's conflicts), their buildings, uploaded files, and the Recurring jobs page.
 using System.ComponentModel.DataAnnotations;
 using FireAlarmScheduler.Entities;
 using FireAlarmScheduler.Services;
@@ -42,8 +42,13 @@ public class JobFormModel
     [Display(Name = "Assigned technicians")]
     public List<Guid> AssignedTechnicianIds { get; set; } = [];
 
-    /// <summary>Choices for the technician checkboxes; filled by the controller, not posted back.</summary>
-    public List<TechnicianOption> AvailableTechnicians { get; set; } = [];
+    /// <summary>Choices for the technician picker, with any conflicts at the form's times; filled by the controller.</summary>
+    public List<TechnicianChoice> AvailableTechnicians { get; set; } = [];
+
+    /// <summary>False when the form's dates or times are invalid, so availability couldn't be checked.</summary>
+    public bool AvailabilityChecked { get; set; }
+
+    public JobSlot Slot => new(Id, StartDate, EndDate, StartTime, EndTime);
 
     /// <summary>On create: the recurring job this new job starts from, or null for a brand-new job.</summary>
     [Display(Name = "Job / project")]
@@ -100,6 +105,27 @@ public class BuildingRowModel
     [StringLength(2000)]
     public string? Notes { get; set; }
 }
+
+/// <summary>
+/// A technician in the job form's picker. <see cref="Conflicts"/> describes what assigning them would clash with;
+/// a conflicting technician can still be assigned.
+/// </summary>
+public record TechnicianChoice(Guid Id, string FullName, List<string> Conflicts)
+{
+    public bool IsFree => Conflicts.Count == 0;
+
+    /// <summary>One line describing a conflict for the proposed job, e.g. "Booked on Smith Tower, Thu, Nov 5, 8:00 AM – 4:00 PM".</summary>
+    public static string Describe(ScheduleConflict conflict)
+    {
+        var dates = ConflictJobViewModel.From(conflict.Job, conflict.FirstDate, conflict.LastDate).DatesText;
+        return conflict.OtherJob is { } other
+            ? $"Booked on {other.Name}, {dates}, {other.StartTime:h:mm tt} – {other.EndTime:h:mm tt}"
+            : $"On approved PTO, {dates}";
+    }
+}
+
+/// <summary>A technician's availability, as returned to the job form's script when the dates or times change.</summary>
+public record TechnicianAvailability(Guid Id, List<string> Conflicts);
 
 /// <summary>A recurring job in the Create Job picker.</summary>
 public record RecurringJobOption(Guid Id, string Name, string Detail);

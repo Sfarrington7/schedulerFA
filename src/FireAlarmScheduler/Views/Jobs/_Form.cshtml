@@ -1,5 +1,5 @@
 @* Shared create/edit form for a job: recurring-job choice, details, buildings (create only), schedule, status, notes,
-   and technician assignment. On create, picking a recurring job reloads the form with its details and building list. *@
+   and the technician picker, which flags technicians who would have a scheduling conflict. On create, picking a recurring job reloads the form with its details and building list. *@
 @model JobFormModel
 <div asp-validation-summary="ModelOnly" class="text-danger"></div>
 <div class="row g-3">
@@ -143,24 +143,58 @@
         </select>
     </div>
     <div class="col-12">
-        <fieldset>
-            <legend class="form-label fs-6">Assigned technicians</legend>
+        @* Technician picker: a dropdown of checkboxes, each marked Free or Conflict for the dates and hours above.
+           wwwroot/js/technician-picker.js refreshes the marks when those change and lists conflicts for the chosen technicians. *@
+        <fieldset class="technician-picker" data-availability-url="@Url.Action("TechnicianAvailability")" data-job-id="@Model.Id">
+            <legend class="form-label fs-6 mb-1">Assigned technicians</legend>
             @if (Model.AvailableTechnicians.Count == 0)
             {
                 <p class="text-body-secondary small mb-0">No technicians yet. <a asp-controller="Technicians" asp-action="Create">Add technicians</a> first, then assign them here.</p>
             }
-            <div class="row">
-                @foreach (var tech in Model.AvailableTechnicians)
-                {
-                    <div class="col-sm-6 col-md-4">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" name="AssignedTechnicianIds" value="@tech.Id" id="tech-@tech.Id"
-                                   checked="@Model.AssignedTechnicianIds.Contains(tech.Id)" />
-                            <label class="form-check-label" for="tech-@tech.Id">@tech.FullName</label>
+            else
+            {
+                var selected = Model.AvailableTechnicians.Where(t => Model.AssignedTechnicianIds.Contains(t.Id)).ToList();
+                <div class="dropdown">
+                    <button class="form-select text-start" type="button" id="technician-picker-toggle"
+                            data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+                        <span data-picker-summary>@(selected.Count == 0 ? "Choose technicians" : string.Join(", ", selected.Select(t => t.FullName)))</span>
+                    </button>
+                    <div class="dropdown-menu technician-menu p-1" aria-labelledby="technician-picker-toggle">
+                        <div class="small text-body-secondary px-2 py-1" data-picker-note>
+                            @(Model.AvailabilityChecked ? "Availability for the dates and hours above." : "Enter valid dates and hours to check availability.")
                         </div>
+                        @foreach (var tech in Model.AvailableTechnicians)
+                        {
+                            var status = !Model.AvailabilityChecked ? "unknown" : tech.IsFree ? "free" : "conflict";
+                            <label class="dropdown-item technician-choice" data-status="@status" data-name="@tech.FullName">
+                                <input class="form-check-input" type="checkbox" name="AssignedTechnicianIds" value="@tech.Id"
+                                       checked="@Model.AssignedTechnicianIds.Contains(tech.Id)" />
+                                <span class="technician-choice-body">
+                                    <span class="technician-choice-name">@tech.FullName</span>
+                                    <span class="badge technician-status" data-status-badge>@(status switch { "free" => "Free", "conflict" => "Conflict", _ => "Not checked" })</span>
+                                    <span class="technician-conflicts" data-conflicts>
+                                        @foreach (var conflict in tech.Conflicts)
+                                        {
+                                            <span class="d-block">@conflict</span>
+                                        }
+                                    </span>
+                                </span>
+                            </label>
+                        }
                     </div>
-                }
-            </div>
+                </div>
+                <div class="alert alert-warning py-2 px-3 small mt-2 mb-0" role="status" data-picker-warning
+                     hidden="@(!selected.Any(t => !t.IsFree && Model.AvailabilityChecked))">
+                    <strong>Scheduling conflict.</strong> You can still save this job, but these technicians are already busy:
+                    <ul class="mb-0 ps-3" data-picker-warning-list>
+                        @foreach (var tech in selected.Where(t => !t.IsFree && Model.AvailabilityChecked))
+                        {
+                            <li><strong>@tech.FullName</strong>: @string.Join("; ", tech.Conflicts)</li>
+                        }
+                    </ul>
+                </div>
+                <noscript><style>.technician-menu { display: block; position: static; }</style></noscript>
+            }
             <span asp-validation-for="AssignedTechnicianIds" class="text-danger small"></span>
         </fieldset>
     </div>

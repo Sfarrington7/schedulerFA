@@ -1,6 +1,7 @@
 // Purpose: Tests conflict detection: double bookings (same technician, overlapping days and daily hours) and
-// jobs during PTO (partial days, touching times, completed and past jobs, which PTO statuses count).
-// Most cases call the pure FindDoubleBookings/FindPtoConflicts methods with in-memory jobs and requests.
+// jobs during PTO (partial days, touching times, completed and past jobs, which PTO statuses count), and the conflicts
+// a technician would have if assigned to a job being created or edited (the job form's picker).
+// Most cases call the pure Find* methods with in-memory jobs and requests.
 using FireAlarmScheduler.Entities;
 using FireAlarmScheduler.Services;
 using FireAlarmScheduler.Tests.TestSupport;
@@ -158,5 +159,76 @@ public class ScheduleConflictServiceTests
         var conflict = Assert.Single(conflicts);
         Assert.Equal(approved.Id, conflict.Pto!.Id);
         Assert.Equal(new DateOnly(2026, 11, 4), conflict.FirstDate);
+    }
+
+    private static JobSlot Slot(string start, string end, string from = "08:00", string to = "16:00", Guid? jobId = null) =>
+        new(jobId, DateOnly.Parse(start), DateOnly.Parse(end), TimeOnly.Parse(from), TimeOnly.Parse(to));
+
+    [Fact]
+    public void FindAssignmentConflicts_TechnicianOnOverlappingJob_ReportsExistingJobForThatTechnicianOnly()
+    {
+        var existing = MakeJob("Smith Tower", "2026-11-09", "2026-11-12", "13:00", "17:00");
+
+        var conflict = Assert.Single(ScheduleConflictService.FindAssignmentConflicts(
+            Slot("2026-11-11", "2026-11-13"), [John, Mike], [existing], []));
+
+        Assert.Equal(ConflictKind.DoubleBooked, conflict.Kind);
+        Assert.Equal(John, conflict.TechnicianId);
+        Assert.Equal("Smith Tower", conflict.OtherJob!.Name);
+        Assert.Equal(new DateOnly(2026, 11, 11), conflict.FirstDate);
+        Assert.Equal(new DateOnly(2026, 11, 12), conflict.LastDate);
+    }
+
+    [Fact]
+    public void FindAssignmentConflicts_ProposedJobStartsBeforeExisting_StillReportsExistingAsOtherJob()
+    {
+        var existing = MakeJob("Smith Tower", "2026-11-12", "2026-11-12");
+
+        var conflict = Assert.Single(ScheduleConflictService.FindAssignmentConflicts(
+            Slot("2026-11-10", "2026-11-12"), [John], [existing], []));
+
+        Assert.Equal("Smith Tower", conflict.OtherJob!.Name);
+        Assert.Equal(new DateOnly(2026, 11, 12), conflict.FirstDate);
+    }
+
+    [Fact]
+    public void FindAssignmentConflicts_EditingTheSameJob_DoesNotConflictWithItself()
+    {
+        var existing = MakeJob("Smith Tower", "2026-11-10", "2026-11-10");
+
+        Assert.Empty(ScheduleConflictService.FindAssignmentConflicts(
+            Slot("2026-11-10", "2026-11-10", jobId: existing.Id), [John], [existing], []));
+    }
+
+    [Fact]
+    public void FindAssignmentConflicts_TouchingHoursOrCompletedJob_NoConflict()
+    {
+        var morning = MakeJob("Morning", "2026-11-10", "2026-11-10", "06:00", "08:00");
+        var done = MakeJob("Done", "2026-11-10", "2026-11-10", status: JobStatus.Completed);
+
+        Assert.Empty(ScheduleConflictService.FindAssignmentConflicts(Slot("2026-11-10", "2026-11-10"), [John], [morning, done], []));
+    }
+
+    [Fact]
+    public void FindAssignmentConflicts_DuringApprovedPto_ReportsPtoConflict()
+    {
+        var pto = MakePto("2026-11-10", "12:00", "2026-11-10", "23:59");
+
+        var conflict = Assert.Single(ScheduleConflictService.FindAssignmentConflicts(
+            Slot("2026-11-09", "2026-11-11"), [John, Mike], [], [pto]));
+
+        Assert.Equal(ConflictKind.OnPto, conflict.Kind);
+        Assert.Equal(John, conflict.TechnicianId);
+        Assert.Equal(new DateOnly(2026, 11, 10), conflict.FirstDate);
+        Assert.Equal(new DateOnly(2026, 11, 10), conflict.LastDate);
+    }
+
+    [Fact]
+    public void FindAssignmentConflicts_EndBeforeStart_NoConflicts()
+    {
+        var existing = MakeJob("Smith Tower", "2026-11-10", "2026-11-10");
+
+        Assert.Empty(ScheduleConflictService.FindAssignmentConflicts(Slot("2026-11-10", "2026-11-10", "16:00", "08:00"), [John], [existing], []));
+        Assert.Empty(ScheduleConflictService.FindAssignmentConflicts(Slot("2026-11-11", "2026-11-10"), [John], [existing], []));
     }
 }
