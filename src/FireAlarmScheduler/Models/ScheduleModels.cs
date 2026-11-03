@@ -105,6 +105,40 @@ public record CalendarDayViewModel(DateOnly Date, bool InMonth, bool IsToday, st
     public IEnumerable<CalendarEntryViewModel> Entries => Slots.OfType<CalendarSlotViewModel>().Select(s => s.Entry);
 }
 
+public static class CalendarLanes
+{
+    /// <summary>
+    /// Gives each job running in the week a lane (line within the week row) so a multi-day job stays on one line.
+    /// Earlier and longer jobs get the top lanes; a lane is reused once the job in it has ended.
+    /// </summary>
+    public static List<(T Item, int Lane)> Assign<T>(IEnumerable<T> items, Func<T, JobSummaryViewModel> jobOf,
+        DateOnly weekStart, DateOnly weekEnd)
+    {
+        var laneEnds = new List<DateOnly>();
+        var placed = new List<(T, int)>();
+        foreach (var item in items.Where(i => jobOf(i).OverlapsRange(weekStart, weekEnd))
+                     .OrderBy(i => jobOf(i).StartDate).ThenByDescending(i => jobOf(i).EndDate)
+                     .ThenBy(i => jobOf(i).StartTime).ThenBy(i => jobOf(i).Name, StringComparer.OrdinalIgnoreCase))
+        {
+            var job = jobOf(item);
+            var lane = laneEnds.FindIndex(end => end < job.StartDate);
+            if (lane < 0)
+            {
+                lane = laneEnds.Count;
+                laneEnds.Add(job.EndDate);
+            }
+            else
+            {
+                laneEnds[lane] = job.EndDate;
+            }
+
+            placed.Add((item, lane));
+        }
+
+        return placed;
+    }
+}
+
 public class MonthCalendarViewModel
 {
     public DateOnly Month { get; init; }
@@ -132,7 +166,7 @@ public class MonthCalendarViewModel
             Weeks = Services.ScheduleCalendar.MonthGrid(first)
                 .Select(week =>
                 {
-                    var lanes = AssignLanes(entries, week[0], week[^1]);
+                    var lanes = CalendarLanes.Assign(entries, e => e.Job, week[0], week[^1]);
                     return week.Select(day => new CalendarDayViewModel(
                         day,
                         day.Month == first.Month,
@@ -143,36 +177,6 @@ public class MonthCalendarViewModel
                 })
                 .ToList()
         };
-    }
-
-    /// <summary>
-    /// Gives each job running in the week a lane (row within the day cells) so a multi-day job stays on one line.
-    /// Earlier and longer jobs get the top lanes; a lane is reused once the job in it has ended.
-    /// </summary>
-    private static List<(CalendarEntryViewModel Entry, int Lane)> AssignLanes(List<CalendarEntryViewModel> entries,
-        DateOnly weekStart, DateOnly weekEnd)
-    {
-        var laneEnds = new List<DateOnly>();
-        var placed = new List<(CalendarEntryViewModel, int)>();
-        foreach (var entry in entries.Where(e => e.Job.OverlapsRange(weekStart, weekEnd))
-                     .OrderBy(e => e.Job.StartDate).ThenByDescending(e => e.Job.EndDate)
-                     .ThenBy(e => e.Job.StartTime).ThenBy(e => e.Job.Name, StringComparer.OrdinalIgnoreCase))
-        {
-            var lane = laneEnds.FindIndex(end => end < entry.Job.StartDate);
-            if (lane < 0)
-            {
-                lane = laneEnds.Count;
-                laneEnds.Add(entry.Job.EndDate);
-            }
-            else
-            {
-                laneEnds[lane] = entry.Job.EndDate;
-            }
-
-            placed.Add((entry, lane));
-        }
-
-        return placed;
     }
 
     /// <summary>The day's jobs in lane order, with null gaps for empty lanes above a used one.</summary>
@@ -206,17 +210,81 @@ public class MonthlyScheduleViewModel
     public string ThisMonthUrl { get; init; } = "";
 }
 
-/// <summary>The Jobs page's month calendar: every job, tagged with its technicians, plus the month's jobs as a list.</summary>
+/// <summary>
+/// One job's bar within a week row of the Jobs calendar: it starts in day <see cref="Column"/> (1 = Monday) and covers
+/// <see cref="Span"/> days on line <see cref="Lane"/>. <see cref="ContinuesBefore"/>/<see cref="ContinuesAfter"/> mark a
+/// job that carries on from the previous week or into the next.
+/// </summary>
+public record JobBarViewModel(JobSummaryViewModel Job, string Url, int ColorIndex, int Column, int Span, int Lane,
+    bool ContinuesBefore, bool ContinuesAfter);
+
+public record JobsCalendarDayViewModel(DateOnly Date, bool InMonth, bool IsToday);
+
+public record JobsCalendarWeekViewModel(List<JobsCalendarDayViewModel> Days, List<JobBarViewModel> Bars)
+{
+    public int LaneCount => Bars.Count == 0 ? 0 : Bars.Max(b => b.Lane) + 1;
+}
+
+/// <summary>A job in the list under the Jobs calendar, with the color of its bar.</summary>
+public record ColoredJobViewModel(JobSummaryViewModel Job, int ColorIndex);
+
+/// <summary>
+/// The Jobs page's month calendar: each job is one solid-colored bar per week row, spanning the days it runs,
+/// plus the month's jobs as a list.
+/// </summary>
 public class JobsCalendarViewModel
 {
-    public MonthCalendarViewModel Calendar { get; init; } = new();
+    /// <summary>Number of distinct job colors defined in site.css (.job-color-0 to -9).</summary>
+    public const int ColorCount = 10;
 
-    /// <summary>Technicians on this month's jobs, for the color key.</summary>
-    public List<TechnicianTagViewModel> Technicians { get; init; } = [];
-    public List<JobSummaryViewModel> MonthJobs { get; init; } = [];
-    public DateOnly PreviousMonth { get; init; }
-    public DateOnly NextMonth { get; init; }
+    public DateOnly Month { get; init; }
+    public List<JobsCalendarWeekViewModel> Weeks { get; init; } = [];
+    public List<ColoredJobViewModel> MonthJobs { get; init; } = [];
+    public DateOnly PreviousMonth => Month.AddMonths(-1);
+    public DateOnly NextMonth => Month.AddMonths(1);
     public DateOnly ThisMonth { get; init; }
+
+    public string Title => Month.ToString("MMMM yyyy");
+
+    /// <summary>
+    /// Lays out <paramref name="jobs"/> on the Monday–Sunday grid for <paramref name="month"/>. Jobs are colored in
+    /// start order, cycling through the palette, so jobs that start near each other get different colors.
+    /// </summary>
+    public static JobsCalendarViewModel Build(DateOnly month, DateOnly today, IReadOnlyList<JobSummaryViewModel> jobs,
+        Func<JobSummaryViewModel, string> urlFor)
+    {
+        var first = Services.ScheduleCalendar.StartOfMonth(month);
+        var colored = jobs.OrderBy(j => j.StartDate).ThenByDescending(j => j.EndDate).ThenBy(j => j.StartTime)
+            .ThenBy(j => j.Name, StringComparer.OrdinalIgnoreCase)
+            .Select((job, i) => new ColoredJobViewModel(job, i % ColorCount))
+            .ToList();
+
+        var weeks = Services.ScheduleCalendar.MonthGrid(first).Select(week =>
+        {
+            var (weekStart, weekEnd) = (week[0], week[^1]);
+            var bars = CalendarLanes.Assign(colored, c => c.Job, weekStart, weekEnd)
+                .Select(placed =>
+                {
+                    var job = placed.Item.Job;
+                    var from = job.StartDate > weekStart ? job.StartDate : weekStart;
+                    var to = job.EndDate < weekEnd ? job.EndDate : weekEnd;
+                    return new JobBarViewModel(job, urlFor(job), placed.Item.ColorIndex,
+                        from.DayNumber - weekStart.DayNumber + 1, to.DayNumber - from.DayNumber + 1, placed.Lane,
+                        job.StartDate < weekStart, job.EndDate > weekEnd);
+                })
+                .ToList();
+            var days = week.Select(day => new JobsCalendarDayViewModel(day, day.Month == first.Month, day == today)).ToList();
+            return new JobsCalendarWeekViewModel(days, bars);
+        }).ToList();
+
+        return new JobsCalendarViewModel
+        {
+            Month = first,
+            Weeks = weeks,
+            MonthJobs = colored.Where(c => c.Job.OverlapsRange(first, first.AddMonths(1).AddDays(-1))).ToList(),
+            ThisMonth = Services.ScheduleCalendar.StartOfMonth(today)
+        };
+    }
 }
 
 public class TechnicianScheduleViewModel

@@ -34,37 +34,19 @@ public class JobsController : Controller
     }
 
     /// <summary>
-    /// Month calendar of every job (default: this month), each shown as a bar across the days it runs and tagged with
-    /// its technicians' colored initials, with the month's jobs listed underneath.
+    /// Month calendar of every job (default: this month), each shown as one solid bar across the days it runs,
+    /// with the month's jobs listed underneath. Technicians are on the Schedule page's month view instead.
     /// </summary>
     public async Task<IActionResult> Calendar(DateOnly? month)
     {
         var today = ScheduleCalendar.Today(_timeProvider);
-        var first = ScheduleCalendar.StartOfMonth(month ?? today);
-        var grid = ScheduleCalendar.MonthGrid(first);
-
-        var technicians = await _technicianService.GetAllAsync();
-        var tags = TechnicianTagViewModel.ForAll(technicians);
-        var lookup = technicians.ToLookup();
+        var grid = ScheduleCalendar.MonthGrid(ScheduleCalendar.StartOfMonth(month ?? today));
+        var lookup = (await _technicianService.GetAllAsync()).ToLookup();
         var jobs = (await _jobService.GetJobsInRangeAsync(grid[0][0], grid[^1][^1]))
             .Select(j => JobSummaryViewModel.FromEntity(j, lookup))
             .ToList();
 
-        var calendar = MonthCalendarViewModel.Build(first, today, jobs,
-            job => new CalendarEntryViewModel(job, Url.Action(nameof(Details), new { id = job.Id })!,
-                tags.Where(t => job.Technicians.Any(a => a.Id == t.Id)).ToList()),
-            _ => []);
-        var monthJobs = jobs.Where(j => j.OverlapsRange(first, first.AddMonths(1).AddDays(-1))).ToList();
-
-        return View(new JobsCalendarViewModel
-        {
-            Calendar = calendar,
-            Technicians = tags.Where(t => monthJobs.Any(j => j.Technicians.Any(a => a.Id == t.Id))).ToList(),
-            MonthJobs = monthJobs,
-            PreviousMonth = first.AddMonths(-1),
-            NextMonth = first.AddMonths(1),
-            ThisMonth = ScheduleCalendar.StartOfMonth(today)
-        });
+        return View(JobsCalendarViewModel.Build(month ?? today, today, jobs, job => Url.Action(nameof(Details), new { id = job.Id })!));
     }
 
     public async Task<IActionResult> Details(Guid id)

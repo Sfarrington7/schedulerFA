@@ -1,5 +1,6 @@
-@* Jobs calendar tab: a month grid where each job is a bar across the days it runs, tagged with its technicians'
-   colored initials, followed by the month's jobs as a list (the easier read on phones). *@
+@* Jobs calendar tab: a Monday–Sunday month where each job is one solid-colored bar spanning the days it runs (a job
+   crossing a weekend continues on the next week's row), followed by the month's jobs listed with matching colors.
+   Each week row is a CSS grid: day cells fill the background and bars sit on numbered lines over them. *@
 @model JobsCalendarViewModel
 @{
     ViewData["Title"] = "Jobs calendar";
@@ -8,7 +9,7 @@
 <partial name="_JobsTabs" />
 
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-    <h2 class="h4 mb-0">@Model.Calendar.Title</h2>
+    <h2 class="h4 mb-0">@Model.Title</h2>
     <div class="btn-group">
         <a class="btn btn-outline-secondary" asp-action="Calendar" asp-route-month="@Model.PreviousMonth.ToString("yyyy-MM-dd")">&larr; Previous</a>
         <a class="btn btn-outline-secondary" asp-action="Calendar" asp-route-month="@Model.ThisMonth.ToString("yyyy-MM-dd")">This month</a>
@@ -16,17 +17,30 @@
     </div>
 </div>
 
-<div class="card mb-2">
-    <partial name="_MonthCalendar" model="Model.Calendar" />
-</div>
-<div class="d-flex flex-wrap gap-3 small text-body-secondary mb-3" aria-label="Calendar key">
-    @foreach (var status in Enum.GetValues<JobStatus>())
+<div class="card mb-3 jobs-calendar" aria-label="@Model.Title jobs">
+    <div class="jobs-calendar-week jobs-calendar-head" aria-hidden="true">
+        @foreach (var day in Model.Weeks[0].Days)
+        {
+            <div><span class="d-none d-md-inline">@day.Date.ToString("ddd")</span><span class="d-md-none">@day.Date.ToString("ddd")[0]</span></div>
+        }
+    </div>
+    @foreach (var week in Model.Weeks)
     {
-        <span><span class="calendar-key job-status-@status"></span> @status.ToDisplayName()</span>
-    }
-    @foreach (var tech in Model.Technicians)
-    {
-        <span><span class="tech-tag tech-color-@tech.ColorIndex">@tech.Initials</span> @tech.FullName</span>
+        <div class="jobs-calendar-week" style="grid-template-rows: 1.6rem repeat(@week.LaneCount, 1.55rem) minmax(1.5rem, 1fr)">
+            @for (var i = 0; i < week.Days.Count; i++)
+            {
+                var day = week.Days[i];
+                <div class="jobs-calendar-day @(day.InMonth ? "" : "other-month") @(day.IsToday ? "today" : "")" style="grid-column: @(i + 1)">
+                    <span class="day-number">@day.Date.Day</span>
+                </div>
+            }
+            @foreach (var bar in week.Bars)
+            {
+                <a class="job-bar job-color-@bar.ColorIndex@(bar.ContinuesBefore ? " continues-before" : "")@(bar.ContinuesAfter ? " continues-after" : "")"
+                   href="@bar.Url" style="grid-column: @bar.Column / span @bar.Span; grid-row: @(bar.Lane + 2)"
+                   title="@bar.Job.Name · @bar.Job.DateRangeText (@bar.Job.DurationText) · @bar.Job.TimeRangeText · @bar.Job.Status.ToDisplayName()">@bar.Job.Name</a>
+            }
+        </div>
     }
 </div>
 
@@ -36,8 +50,8 @@
     <p class="text-body-secondary">No jobs this month. <a asp-action="Create">Create a job</a>.</p>
 }
 <div class="list-group mb-2">
-    @foreach (var job in Model.MonthJobs)
+    @foreach (var item in Model.MonthJobs)
     {
-        <partial name="_JobListItem" model="job" />
+        <partial name="_JobListItem" model="item.Job" view-data='new ViewDataDictionary(ViewData) { ["ColorIndex"] = item.ColorIndex }' />
     }
 </div>

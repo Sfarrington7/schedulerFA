@@ -1,6 +1,6 @@
-// Purpose: Tests the Jobs page calendar over HTTP: every job in the month (assigned or not) shown on each day it runs
-// with joined multi-day bars, technician tags and color key, the month's job list with day counts, month navigation,
-// the List/Calendar tabs, and that technicians can't open it.
+// Purpose: Tests the Jobs page calendar over HTTP: every job in the month (assigned or not) shown as one colored bar
+// spanning its days (no technician tags), a job running into the next month, the month's job list with matching color
+// swatches and day counts, month navigation, the List/Calendar tabs, and that technicians can't open it.
 using System.Net;
 using FireAlarmScheduler.Entities;
 using FireAlarmScheduler.Services;
@@ -45,13 +45,34 @@ public class JobsCalendarTests : IDisposable
         var html = WebUtility.HtmlDecode(await client.GetStringAsync("/Jobs/Calendar?month=2026-11-01"));
 
         Assert.Contains("November 2026", html);
-        Assert.Equal(5, Count(html, "calendar-entry-name\">Central Plaza Inspection<"));
-        Assert.Equal(1, Count(html, "calendar-entry-name\">Riverside Hospital<"));
+        Assert.Equal(1, Count(html, "style=\"grid-column: 1 / span 5; grid-row: 2\""));
+        Assert.Equal(1, Count(html, ">Central Plaza Inspection</a>"));
+        Assert.Equal(1, Count(html, "style=\"grid-column: 3 / span 1; grid-row: 2\""));
+        Assert.Equal(1, Count(html, ">Riverside Hospital</a>"));
+        Assert.Contains("class=\"job-bar job-color-0\"", html);
+        Assert.Contains("class=\"job-bar job-color-1\"", html);
         Assert.DoesNotContain("December Job", html);
-        Assert.Equal(5 + 1, Count(html, ">JS</span>"));
-        Assert.Contains("<span class=\"tech-tag tech-color-0\">JS</span> John Smith", html);
-        Assert.Equal(4, Count(html, "continues-after"));
-        Assert.Equal(4, Count(html, "continues-before"));
+        Assert.DoesNotContain("tech-tag", html);
+    }
+
+    [Fact]
+    public async Task Calendar_JobIntoNextMonth_ShowsOnTrailingDaysAndContinues()
+    {
+        await SeedAsync();
+        using (var scope = _factory.Services.CreateScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<JobService>().CreateAsync(ServiceHarness.ValidJob() with
+            {
+                Name = "City Hall", StartDate = new DateOnly(2026, 11, 27), EndDate = new DateOnly(2026, 12, 2)
+            });
+        }
+        var client = await _factory.SignInAsNewUserAsync(AppRoles.TeamLead);
+
+        var html = WebUtility.HtmlDecode(await client.GetStringAsync("/Jobs/Calendar?month=2026-11-01"));
+
+        Assert.Contains("class=\"job-bar job-color-2 continues-after\"", html);
+        Assert.Contains("class=\"job-bar job-color-2 continues-before\"", html);
+        Assert.Equal(2, Count(html, ">City Hall</a>"));
     }
 
     [Fact]
@@ -63,6 +84,8 @@ public class JobsCalendarTests : IDisposable
         var html = WebUtility.HtmlDecode(await client.GetStringAsync("/Jobs/Calendar?month=2026-11-01"));
 
         Assert.Contains("Mon, Nov 2 – Fri, Nov 6, 2026 · 8:00 AM – 4:00 PM · <span class=\"text-body-secondary\">5 days</span>", html);
+        var swatch = html.IndexOf("<span class=\"job-swatch job-color-0\" aria-hidden=\"true\"></span>", StringComparison.Ordinal);
+        Assert.InRange(html.IndexOf("Central Plaza Inspection</strong>", StringComparison.Ordinal) - swatch, 1, 120);
         Assert.Contains("<span class=\"text-body-secondary\">1 day</span>", html);
         Assert.Contains("href=\"/Jobs/Calendar?month=2026-10-01\"", html);
         Assert.Contains("href=\"/Jobs/Calendar?month=2026-12-01\"", html);
