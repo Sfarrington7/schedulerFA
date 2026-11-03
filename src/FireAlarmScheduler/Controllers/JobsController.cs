@@ -1,4 +1,4 @@
-// Purpose: Job pages for team leads and administrators: list, view, create (new or from a recurring job), edit, and
+// Purpose: Job pages for team leads and administrators: list, month calendar, view, create (new or from a recurring job), edit, and
 // delete jobs and assign technicians, showing which technicians would have a scheduling conflict.
 using FireAlarmScheduler.Models;
 using FireAlarmScheduler.Services;
@@ -31,6 +31,40 @@ public class JobsController : Controller
         var lookup = (await _technicianService.GetAllAsync()).ToLookup();
         var model = (await _jobService.GetAllAsync()).Select(j => JobSummaryViewModel.FromEntity(j, lookup)).ToList();
         return View(model);
+    }
+
+    /// <summary>
+    /// Month calendar of every job (default: this month), each shown as a bar across the days it runs and tagged with
+    /// its technicians' colored initials, with the month's jobs listed underneath.
+    /// </summary>
+    public async Task<IActionResult> Calendar(DateOnly? month)
+    {
+        var today = ScheduleCalendar.Today(_timeProvider);
+        var first = ScheduleCalendar.StartOfMonth(month ?? today);
+        var grid = ScheduleCalendar.MonthGrid(first);
+
+        var technicians = await _technicianService.GetAllAsync();
+        var tags = TechnicianTagViewModel.ForAll(technicians);
+        var lookup = technicians.ToLookup();
+        var jobs = (await _jobService.GetJobsInRangeAsync(grid[0][0], grid[^1][^1]))
+            .Select(j => JobSummaryViewModel.FromEntity(j, lookup))
+            .ToList();
+
+        var calendar = MonthCalendarViewModel.Build(first, today, jobs,
+            job => new CalendarEntryViewModel(job, Url.Action(nameof(Details), new { id = job.Id })!,
+                tags.Where(t => job.Technicians.Any(a => a.Id == t.Id)).ToList()),
+            _ => []);
+        var monthJobs = jobs.Where(j => j.OverlapsRange(first, first.AddMonths(1).AddDays(-1))).ToList();
+
+        return View(new JobsCalendarViewModel
+        {
+            Calendar = calendar,
+            Technicians = tags.Where(t => monthJobs.Any(j => j.Technicians.Any(a => a.Id == t.Id))).ToList(),
+            MonthJobs = monthJobs,
+            PreviousMonth = first.AddMonths(-1),
+            NextMonth = first.AddMonths(1),
+            ThisMonth = ScheduleCalendar.StartOfMonth(today)
+        });
     }
 
     public async Task<IActionResult> Details(Guid id)

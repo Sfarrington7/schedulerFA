@@ -1,16 +1,10 @@
-@* List of all jobs with schedule, status, technicians, and links to manage each one. *@
+@* Jobs list tab: all jobs with schedule, status, technicians, and links to manage each one. *@
 @model List<JobSummaryViewModel>
 @{
     ViewData["Title"] = "Jobs";
 }
 
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h1 class="h3 mb-0">Jobs</h1>
-    <div class="d-flex gap-2">
-        <a class="btn btn-outline-secondary" asp-controller="RecurringJobs" asp-action="Index">Recurring jobs</a>
-        <a class="btn btn-primary" asp-action="Create">Create job</a>
-    </div>
-</div>
+<partial name="_JobsTabs" />
 
 @if (Model.Count == 0)
 {

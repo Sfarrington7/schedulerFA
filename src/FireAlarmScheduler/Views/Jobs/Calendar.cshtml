@@ -1,0 +1,43 @@
+@* Jobs calendar tab: a month grid where each job is a bar across the days it runs, tagged with its technicians'
+   colored initials, followed by the month's jobs as a list (the easier read on phones). *@
+@model JobsCalendarViewModel
+@{
+    ViewData["Title"] = "Jobs calendar";
+}
+
+<partial name="_JobsTabs" />
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h2 class="h4 mb-0">@Model.Calendar.Title</h2>
+    <div class="btn-group">
+        <a class="btn btn-outline-secondary" asp-action="Calendar" asp-route-month="@Model.PreviousMonth.ToString("yyyy-MM-dd")">&larr; Previous</a>
+        <a class="btn btn-outline-secondary" asp-action="Calendar" asp-route-month="@Model.ThisMonth.ToString("yyyy-MM-dd")">This month</a>
+        <a class="btn btn-outline-secondary" asp-action="Calendar" asp-route-month="@Model.NextMonth.ToString("yyyy-MM-dd")">Next &rarr;</a>
+    </div>
+</div>
+
+<div class="card mb-2">
+    <partial name="_MonthCalendar" model="Model.Calendar" />
+</div>
+<div class="d-flex flex-wrap gap-3 small text-body-secondary mb-3" aria-label="Calendar key">
+    @foreach (var status in Enum.GetValues<JobStatus>())
+    {
+        <span><span class="calendar-key job-status-@status"></span> @status.ToDisplayName()</span>
+    }
+    @foreach (var tech in Model.Technicians)
+    {
+        <span><span class="tech-tag tech-color-@tech.ColorIndex">@tech.Initials</span> @tech.FullName</span>
+    }
+</div>
+
+<h3 class="h6">Jobs this month</h3>
+@if (Model.MonthJobs.Count == 0)
+{
+    <p class="text-body-secondary">No jobs this month. <a asp-action="Create">Create a job</a>.</p>
+}
+<div class="list-group mb-2">
+    @foreach (var job in Model.MonthJobs)
+    {
+        <partial name="_JobListItem" model="job" />
+    }
+</div>

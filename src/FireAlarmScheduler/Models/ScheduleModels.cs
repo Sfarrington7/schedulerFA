@@ -1,5 +1,6 @@
 // Purpose: View models for date-organized pages: the dashboard, the team lead's weekly grid and
-// monthly calendar, and the technician's daily/weekly/monthly schedule, including approved PTO on each day.
+// monthly calendar, the Jobs page calendar, and the technician's daily/weekly/monthly schedule, including approved PTO.
+// Month grids place each job in a lane so multi-day jobs show as one joined bar per week row.
 namespace FireAlarmScheduler.Models;
 
 /// <summary>One day of a schedule list: its jobs and any approved time off (PTO is only filled on technician schedules).</summary>
@@ -88,8 +89,21 @@ public record TechnicianTagViewModel(Guid Id, string FullName, string Initials, 
 /// <summary>One job on one calendar day, with where it links to and which shown technicians are on it.</summary>
 public record CalendarEntryViewModel(JobSummaryViewModel Job, string Url, List<TechnicianTagViewModel> Technicians);
 
-public record CalendarDayViewModel(DateOnly Date, bool InMonth, bool IsToday, string? DayUrl, List<CalendarEntryViewModel> Entries,
-    List<PtoDayViewModel> Pto);
+/// <summary>
+/// A job's bar on one calendar day. <see cref="ContinuesBefore"/>/<see cref="ContinuesAfter"/> are true when the job
+/// also runs on the day before/after, so the bar joins its neighbors and shows how long the job takes.
+/// </summary>
+public record CalendarSlotViewModel(CalendarEntryViewModel Entry, bool ContinuesBefore, bool ContinuesAfter);
+
+/// <summary>
+/// One day of a month grid. <see cref="Slots"/> holds the day's jobs by lane: a multi-day job keeps the same lane on
+/// every day of its week row, and a null slot is an empty gap that keeps the lanes below it lined up.
+/// </summary>
+public record CalendarDayViewModel(DateOnly Date, bool InMonth, bool IsToday, string? DayUrl, List<CalendarSlotViewModel?> Slots,
+    List<PtoDayViewModel> Pto)
+{
+    public IEnumerable<CalendarEntryViewModel> Entries => Slots.OfType<CalendarSlotViewModel>().Select(s => s.Entry);
+}
 
 public class MonthCalendarViewModel
 {
@@ -116,15 +130,66 @@ public class MonthCalendarViewModel
         {
             Month = first,
             Weeks = Services.ScheduleCalendar.MonthGrid(first)
-                .Select(week => week.Select(day => new CalendarDayViewModel(
-                    day,
-                    day.Month == first.Month,
-                    day == today,
-                    dayUrl?.Invoke(day),
-                    entries.Where(e => e.Job.OverlapsRange(day, day)).ToList(),
-                    ptoFor(day))).ToList())
+                .Select(week =>
+                {
+                    var lanes = AssignLanes(entries, week[0], week[^1]);
+                    return week.Select(day => new CalendarDayViewModel(
+                        day,
+                        day.Month == first.Month,
+                        day == today,
+                        dayUrl?.Invoke(day),
+                        SlotsOn(day, lanes),
+                        ptoFor(day))).ToList();
+                })
                 .ToList()
         };
+    }
+
+    /// <summary>
+    /// Gives each job running in the week a lane (row within the day cells) so a multi-day job stays on one line.
+    /// Earlier and longer jobs get the top lanes; a lane is reused once the job in it has ended.
+    /// </summary>
+    private static List<(CalendarEntryViewModel Entry, int Lane)> AssignLanes(List<CalendarEntryViewModel> entries,
+        DateOnly weekStart, DateOnly weekEnd)
+    {
+        var laneEnds = new List<DateOnly>();
+        var placed = new List<(CalendarEntryViewModel, int)>();
+        foreach (var entry in entries.Where(e => e.Job.OverlapsRange(weekStart, weekEnd))
+                     .OrderBy(e => e.Job.StartDate).ThenByDescending(e => e.Job.EndDate)
+                     .ThenBy(e => e.Job.StartTime).ThenBy(e => e.Job.Name, StringComparer.OrdinalIgnoreCase))
+        {
+            var lane = laneEnds.FindIndex(end => end < entry.Job.StartDate);
+            if (lane < 0)
+            {
+                lane = laneEnds.Count;
+                laneEnds.Add(entry.Job.EndDate);
+            }
+            else
+            {
+                laneEnds[lane] = entry.Job.EndDate;
+            }
+
+            placed.Add((entry, lane));
+        }
+
+        return placed;
+    }
+
+    /// <summary>The day's jobs in lane order, with null gaps for empty lanes above a used one.</summary>
+    private static List<CalendarSlotViewModel?> SlotsOn(DateOnly day, List<(CalendarEntryViewModel Entry, int Lane)> lanes)
+    {
+        var slots = new List<CalendarSlotViewModel?>();
+        foreach (var (entry, lane) in lanes.Where(l => l.Entry.Job.OverlapsRange(day, day)))
+        {
+            while (slots.Count <= lane)
+            {
+                slots.Add(null);
+            }
+
+            slots[lane] = new CalendarSlotViewModel(entry, entry.Job.StartDate < day, entry.Job.EndDate > day);
+        }
+
+        return slots;
     }
 }
 
@@ -139,6 +204,19 @@ public class MonthlyScheduleViewModel
     public string PreviousMonthUrl { get; init; } = "";
     public string NextMonthUrl { get; init; } = "";
     public string ThisMonthUrl { get; init; } = "";
+}
+
+/// <summary>The Jobs page's month calendar: every job, tagged with its technicians, plus the month's jobs as a list.</summary>
+public class JobsCalendarViewModel
+{
+    public MonthCalendarViewModel Calendar { get; init; } = new();
+
+    /// <summary>Technicians on this month's jobs, for the color key.</summary>
+    public List<TechnicianTagViewModel> Technicians { get; init; } = [];
+    public List<JobSummaryViewModel> MonthJobs { get; init; } = [];
+    public DateOnly PreviousMonth { get; init; }
+    public DateOnly NextMonth { get; init; }
+    public DateOnly ThisMonth { get; init; }
 }
 
 public class TechnicianScheduleViewModel

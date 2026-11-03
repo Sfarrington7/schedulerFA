@@ -1,0 +1,15 @@
+@* List / Calendar switch shown at the top of the Jobs pages, with the Recurring jobs and Create job buttons. *@
+@{
+    var action = ViewContext.RouteData.Values["action"]?.ToString();
+}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h1 class="h3 mb-0">Jobs</h1>
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-secondary" asp-controller="RecurringJobs" asp-action="Index">Recurring jobs</a>
+        <a class="btn btn-primary" asp-action="Create">Create job</a>
+    </div>
+</div>
+<ul class="nav nav-tabs mb-3">
+    <li class="nav-item"><a class="nav-link @(action == "Index" ? "active" : "")" asp-action="Index">List</a></li>
+    <li class="nav-item"><a class="nav-link @(action == "Calendar" ? "active" : "")" asp-action="Calendar">Calendar</a></li>
+</ul>

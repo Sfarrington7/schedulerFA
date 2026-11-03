@@ -1,5 +1,6 @@
-@* Monday–Sunday month grid used by the team lead and technician month views. Each day lists approved PTO
-   (striped) and then its jobs, tagged with the shown technicians' colored initials; on phones names collapse to dots. *@
+@* Monday–Sunday month grid used by the Jobs calendar and the team lead and technician month views. Each day lists its
+   jobs by lane, so a multi-day job is one joined bar across its days (tinted by status, tagged with the shown
+   technicians' colored initials), then approved PTO (striped). On phones names collapse to dots. *@
 @model MonthCalendarViewModel
 <div class="table-responsive">
     <table class="table table-bordered month-calendar mb-0" aria-label="@Model.Title">
@@ -26,20 +27,17 @@
                             {
                                 <span class="day-number">@day.Date.Day</span>
                             }
-                            @foreach (var pto in day.Pto)
+                            @foreach (var slot in day.Slots)
                             {
-                                <div class="calendar-entry pto-entry" title="@pto.TechnicianName · PTO · @pto.HoursText">
-                                    @if (pto.Tag is not null)
-                                    {
-                                        <span class="tech-tag tech-color-@pto.Tag.ColorIndex">@pto.Tag.Initials</span>
-                                    }
-                                    <span class="calendar-entry-name">PTO@(pto.HoursText == "All day" ? "" : $" · {pto.HoursText}")</span>
-                                    <span class="calendar-dot pto-dot" aria-hidden="true"></span>
-                                </div>
-                            }
-                            @foreach (var entry in day.Entries)
-                            {
-                                <a class="calendar-entry" href="@entry.Url" title="@entry.Job.Name · @entry.Job.TimeRangeText · @entry.Job.TechnicianNamesText">
+                                if (slot is null)
+                                {
+                                    <div class="calendar-entry calendar-gap" aria-hidden="true">&nbsp;</div>
+                                    continue;
+                                }
+                                var entry = slot.Entry;
+                                var joins = (slot.ContinuesBefore ? " continues-before" : "") + (slot.ContinuesAfter ? " continues-after" : "");
+                                <a class="calendar-entry job-status-@entry.Job.Status@joins" href="@entry.Url"
+                                   title="@entry.Job.Name · @entry.Job.DateRangeText (@entry.Job.DurationText) · @entry.Job.TimeRangeText · @entry.Job.TechnicianNamesText">
                                     @* Tags come first so a long job name is what gets cut off, not the technicians. *@
                                     @foreach (var tech in entry.Technicians)
                                     {
@@ -51,6 +49,17 @@
                                     }
                                     <span class="calendar-entry-name">@entry.Job.Name</span>
                                 </a>
+                            }
+                            @foreach (var pto in day.Pto)
+                            {
+                                <div class="calendar-entry pto-entry" title="@pto.TechnicianName · PTO · @pto.HoursText">
+                                    @if (pto.Tag is not null)
+                                    {
+                                        <span class="tech-tag tech-color-@pto.Tag.ColorIndex">@pto.Tag.Initials</span>
+                                    }
+                                    <span class="calendar-entry-name">PTO@(pto.HoursText == "All day" ? "" : $" · {pto.HoursText}")</span>
+                                    <span class="calendar-dot pto-dot" aria-hidden="true"></span>
+                                </div>
                             }
                         </td>
                     }

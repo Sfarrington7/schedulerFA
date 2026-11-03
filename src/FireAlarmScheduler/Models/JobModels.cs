@@ -168,6 +168,11 @@ public class JobSummaryViewModel
 
     public string TimeRangeText => $"{StartTime:h:mm tt} – {EndTime:h:mm tt}";
 
+    /// <summary>Number of days the job runs, counting both the start and end dates.</summary>
+    public int DayCount => EndDate.DayNumber - StartDate.DayNumber + 1;
+
+    public string DurationText => DayCount == 1 ? "1 day" : $"{DayCount} days";
+
     /// <summary>True when the job runs on any day from <paramref name="from"/> to <paramref name="to"/> inclusive.</summary>
     public bool OverlapsRange(DateOnly from, DateOnly to) => StartDate <= to && EndDate >= from;
 

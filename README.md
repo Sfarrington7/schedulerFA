@@ -154,6 +154,8 @@ With no accounts in the database, the app opens **First-time setup**. Create the
 5. Open each building and upload its `.xlsx`, `.xls`, or `.csv` file.
 6. **Sign out**, sign in as John, open the job from **My Schedule**, and download Building A's file.
 
+The **Jobs** page has two tabs: **List** (every job in a table) and **Calendar**, a month view of every job where a multi-day job is one bar across the days it runs, tinted by status (scheduled, in progress, completed) and tagged with its technicians' colored initials; the month's jobs, with how many days each takes, are listed underneath.
+
 The **Schedule** page has two tabs. **Week** is a grid of technicians and their jobs by day. **Month** is a calendar where you tick which technicians to show (one, several, or all); each technician has a color, and their initials appear on their jobs. Technicians get a **Month** button on their schedule too, showing a calendar with a list of that month's jobs under it.
 
 ## Coding, comments, and testing expectations
@@ -203,6 +205,7 @@ Key expectations:
 - **Decision:** Buildings keep the order they were added (`SortOrder`); file bytes live outside the database under generated names.
 - **Decision:** Job times are daily working hours that apply to every day from the start date to the end date.
 - **Decision:** Building names must be unique within a job. Deleting a technician unassigns them from all jobs. Deleting a job or building deletes its files.
+- **Decision (job bars):** On every month calendar, each job keeps one line (lane) across its days within a week row, so it reads as one joined bar; earlier and longer jobs take the top lines, and an empty gap keeps later lines aligned. A job that runs past Sunday continues at the start of the next row. Approved PTO is listed under the day's jobs so it doesn't break the bars. Bars are tinted by status on desktop; on phones they shrink to dots and initials as before.
 - **Decision:** Month calendars run Monday–Sunday and include the days from neighboring months that fill the first and last rows. The team lead's month view shows every technician until the picker is used; the choice is kept in the page address (so Previous/Next keep it), not saved per user. Technician colors follow the technician list order, so a technician's color can change when technicians are added or removed.
 - **Decision:** Team leads and administrators can pick any technician in the Technician View (the choice is remembered in a cookie); technician accounts always see their own.
 - **Limitation:** Two people editing the same job at the same moment: the last save wins (no optimistic-concurrency check). Building-name uniqueness is checked in code, not by a database constraint.
