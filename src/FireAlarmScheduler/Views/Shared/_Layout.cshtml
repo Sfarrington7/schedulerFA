@@ -1,4 +1,5 @@
-@* Site layout. Signed in: a sidebar of role-aware links grouped by area, with the account and sign-out at its foot;
+@* Site layout. Signed in: a sidebar of role-aware links grouped by area (the Time off group, with its count badges,
+   comes from the TimeOffNav view component), with the account and sign-out at its foot;
    on phones and tablets the sidebar becomes a slide-out menu opened from a top bar. Signed out: a centered page for
    sign-in and setup. Both show status messages and the prototype notice. *@
 @using FireAlarmScheduler.Services
@@ -53,9 +54,7 @@
                 }
                 @if (canManagePto)
                 {
-                    <div class="app-nav-group">Time off</div>
-                    <a class="@NavClass("PtoRequests")" aria-current="@Current("PtoRequests")" asp-controller="PtoRequests" asp-action="Index"><svg class="app-icon" aria-hidden="true"><use href="@icons#pto" /></svg><span>PTO Requests</span></a>
-                    <a class="@NavClass("Conflicts")" aria-current="@Current("Conflicts")" asp-controller="Conflicts" asp-action="Index"><svg class="app-icon" aria-hidden="true"><use href="@icons#conflicts" /></svg><span>Conflicts</span></a>
+                    @await Component.InvokeAsync("TimeOffNav")
                 }
                 @if (canManageUsers)
                 {

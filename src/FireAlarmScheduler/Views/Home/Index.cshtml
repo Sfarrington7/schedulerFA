@@ -1,4 +1,5 @@
-@* Team lead dashboard: current and upcoming jobs, the team, and the next two weeks organized by date. *@
+@* Team lead dashboard: summary cards (each links to its page), current and upcoming jobs, the team, and the next two
+   weeks organized by date. *@
 @model DashboardViewModel
 @{
     ViewData["Title"] = "Dashboard";
@@ -10,6 +11,19 @@
         <a class="btn btn-primary" asp-controller="Jobs" asp-action="Create">Create job</a>
         <a class="btn btn-outline-secondary" asp-controller="Technicians" asp-action="Create">Add technician</a>
     </div>
+</div>
+
+<div class="row g-3 mb-3">
+    @foreach (var card in Model.SummaryCards)
+    {
+        <div class="col-6 col-xl-3">
+            <a class="card summary-card h-100" data-card="@card.Label" asp-controller="@card.Controller" asp-action="@card.Action">
+                <span class="summary-label">@card.Label</span>
+                <span class="summary-count @(card.Tone == SummaryTone.Problem && card.Count > 0 ? "text-danger" : "")">@card.Count</span>
+                <span class="summary-detail summary-@card.Tone.ToString().ToLowerInvariant()">@card.Detail</span>
+            </a>
+        </div>
+    }
 </div>
 
 <div class="row g-3">

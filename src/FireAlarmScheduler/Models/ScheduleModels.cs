@@ -44,6 +44,9 @@ public record PtoDayViewModel(Guid TechnicianId, string TechnicianName, string H
 public class DashboardViewModel
 {
     public DateOnly Today { get; init; }
+
+    /// <summary>Jobs today, upcoming jobs, pending PTO, and conflicts, shown as cards across the top.</summary>
+    public List<SummaryCardViewModel> SummaryCards { get; init; } = [];
     public List<JobSummaryViewModel> CurrentJobs { get; init; } = [];
     public List<JobSummaryViewModel> UpcomingJobs { get; init; } = [];
     public List<TechnicianListItemViewModel> Technicians { get; init; } = [];

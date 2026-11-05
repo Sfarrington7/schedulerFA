@@ -68,6 +68,7 @@ builder.Services.AddScoped<BuildingFileService>();
 builder.Services.AddScoped<UserAdministrationService>();
 builder.Services.AddScoped<PtoService>();
 builder.Services.AddScoped<ScheduleConflictService>();
+builder.Services.AddScoped<ScheduleAlertService>();
 
 var app = builder.Build();
 

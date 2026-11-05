@@ -1,0 +1,24 @@
+@* Sidebar "Time off" group: PTO Requests and Conflicts links, each with a red count badge when something needs
+   attention (no badge at zero). The hidden words let screen readers say what the number counts. *@
+@model NavAlertCountsViewModel
+@{
+    var controller = ViewContext.RouteData.Values["controller"]?.ToString();
+    string NavClass(string name) => controller == name ? "app-nav-link active" : "app-nav-link";
+    string? Current(string name) => controller == name ? "page" : null;
+    var icons = Url.Content("~/img/icons.svg");
+}
+<div class="app-nav-group">Time off</div>
+<a class="@NavClass("PtoRequests")" aria-current="@Current("PtoRequests")" asp-controller="PtoRequests" asp-action="Index">
+    <svg class="app-icon" aria-hidden="true"><use href="@icons#pto" /></svg><span>PTO Requests</span>
+    @if (Model.PendingPto > 0)
+    {
+        <span class="app-nav-count" data-count="pto">@NavAlertCountsViewModel.BadgeText(Model.PendingPto)<span class="visually-hidden"> waiting for review</span></span>
+    }
+</a>
+<a class="@NavClass("Conflicts")" aria-current="@Current("Conflicts")" asp-controller="Conflicts" asp-action="Index">
+    <svg class="app-icon" aria-hidden="true"><use href="@icons#conflicts" /></svg><span>Conflicts</span>
+    @if (Model.Conflicts > 0)
+    {
+        <span class="app-nav-count" data-count="conflicts">@NavAlertCountsViewModel.BadgeText(Model.Conflicts)<span class="visually-hidden"> current</span></span>
+    }
+</a>

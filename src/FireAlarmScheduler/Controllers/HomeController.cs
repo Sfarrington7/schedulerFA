@@ -1,4 +1,5 @@
-// Purpose: Team lead dashboard: current and upcoming jobs, the team, and the next two weeks by date.
+// Purpose: Team lead dashboard: summary cards (jobs today, upcoming, pending PTO, conflicts), current and upcoming
+// jobs, the team, and the next two weeks by date.
 // Accounts that can't manage the schedule (technicians) are sent to their own schedule instead.
 using System.Diagnostics;
 using FireAlarmScheduler.Models;
@@ -15,12 +16,15 @@ public class HomeController : Controller
 
     private readonly JobService _jobService;
     private readonly TechnicianService _technicianService;
+    private readonly ScheduleAlertService _alertService;
     private readonly TimeProvider _timeProvider;
 
-    public HomeController(JobService jobService, TechnicianService technicianService, TimeProvider timeProvider)
+    public HomeController(JobService jobService, TechnicianService technicianService, ScheduleAlertService alertService,
+        TimeProvider timeProvider)
     {
         _jobService = jobService;
         _technicianService = technicianService;
+        _alertService = alertService;
         _timeProvider = timeProvider;
     }
 
@@ -37,9 +41,13 @@ public class HomeController : Controller
         var jobs = (await _jobService.GetAllAsync()).Select(j => JobSummaryViewModel.FromEntity(j, lookup)).ToList();
         var lastDay = today.AddDays(DashboardDays - 1);
 
+        var alerts = await _alertService.GetAsync();
+
         var model = new DashboardViewModel
         {
             Today = today,
+            SummaryCards = DashboardSummary.Build(jobs, alerts,
+                id => lookup.TryGetValue(id, out var tech) ? tech.FullName : "Unknown technician"),
             CurrentJobs = jobs.Where(j => j.StartDate <= today && j.EndDate >= today).ToList(),
             UpcomingJobs = jobs.Where(j => j.StartDate > today).Take(MaxUpcomingJobs).ToList(),
             Technicians = technicians

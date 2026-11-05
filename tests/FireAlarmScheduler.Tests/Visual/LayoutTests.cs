@@ -280,6 +280,10 @@ public sealed class PhoneLayoutTests(VisualTestApp app) : LayoutTests(app, "phon
         Assert.InRange(box.X, -1, 1);
         Assert.True(box.Width <= 390, "The open menu fits on the screen.");
         Assert.True(await page.GetByRole(AriaRole.Button, new() { Name = "Sign out" }).IsVisibleAsync());
+        Assert.Equal("1 waiting for review", await sidebar.Locator("[data-count=pto]").TextContentAsync());
+        Assert.Equal("2 current", await sidebar.Locator("[data-count=conflicts]").TextContentAsync());
+        var badge = await sidebar.Locator("[data-count=conflicts]").BoundingBoxAsync();
+        Assert.True(badge is not null && badge.X + badge.Width <= box.X + box.Width, "The conflicts badge sits inside the open menu.");
 
         await jobsLink.ClickAsync();
         await page.WaitForURLAsync(url => url.EndsWith("/Jobs"));

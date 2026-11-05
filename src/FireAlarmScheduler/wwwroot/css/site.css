@@ -164,6 +164,20 @@ a.app-brand:hover {
   color: #60a5fa;
 }
 
+/* Sidebar count badges (pending PTO, conflicts): a red pill at the end of the link. */
+.app-nav-count {
+  min-width: 1.5rem;
+  margin-left: auto;
+  padding: .1rem .45rem;
+  border-radius: 999px;
+  background-color: #dc2626;
+  color: #fff;
+  font-size: .75rem;
+  font-weight: 700;
+  line-height: 1.35;
+  text-align: center;
+}
+
 .app-account {
   margin-top: auto;
   padding: .9rem .75rem 1rem;
@@ -534,6 +548,43 @@ h1.h3 {
   --bs-dropdown-link-active-bg: var(--app-accent);
   box-shadow: 0 12px 30px rgba(15, 23, 42, .12);
 }
+
+/* Dashboard summary cards: each card is a link to its page, with a big number and a one-line detail. */
+.summary-card {
+  display: flex;
+  flex-direction: column;
+  gap: .15rem;
+  padding: .9rem 1.1rem;
+  color: var(--app-text);
+}
+
+.summary-card:hover {
+  border-color: var(--app-accent-line);
+  color: var(--app-text);
+  text-decoration: none;
+}
+
+.summary-label {
+  color: var(--app-muted);
+  font-size: .85rem;
+}
+
+.summary-count {
+  font-size: 1.85rem;
+  font-weight: 700;
+  letter-spacing: -.02em;
+  line-height: 1.15;
+}
+
+.summary-detail {
+  font-size: .8rem;
+  font-weight: 600;
+  color: var(--app-muted);
+}
+
+.summary-clear { color: #15803d; }
+.summary-attention { color: #b45309; }
+.summary-problem { color: #b91c1c; }
 
 /* Dashboard: today's row in the next-14-days table. */
 .table-today > * {
