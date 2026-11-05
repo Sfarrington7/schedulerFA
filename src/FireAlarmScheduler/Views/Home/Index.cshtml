@@ -63,7 +63,7 @@
                     <tbody>
                         @foreach (var day in Model.Days)
                         {
-                            <tr class="@(day.Date == Model.Today ? "table-warning" : "")">
+                            <tr class="@(day.Date == Model.Today ? "table-today" : "")">
                                 <th class="text-nowrap ps-3">@day.Date.ToString("ddd, MMM d")</th>
                                 <td>
                                     @foreach (var job in day.Jobs)

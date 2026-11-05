@@ -1,15 +1,22 @@
-@* Site layout: role-aware navigation, the signed-in account menu, status messages, and page body. *@
+@* Site layout. Signed in: a sidebar of role-aware links grouped by area, with the account and sign-out at its foot;
+   on phones and tablets the sidebar becomes a slide-out menu opened from a top bar. Signed out: a centered page for
+   sign-in and setup. Both show status messages and the prototype notice. *@
 @using FireAlarmScheduler.Services
 @using Microsoft.AspNetCore.Authorization
 @inject IAuthorizationService AuthorizationService
 @{
     var controller = ViewContext.RouteData.Values["controller"]?.ToString();
-    string NavClass(string name) => controller == name ? "nav-link active" : "nav-link";
+    string NavClass(string name) => controller == name ? "app-nav-link active" : "app-nav-link";
+    string? Current(string name) => controller == name ? "page" : null;
     var signedIn = User.Identity?.IsAuthenticated == true;
     var canManageSchedule = signedIn && (await AuthorizationService.AuthorizeAsync(User, AppPolicies.ManageSchedule)).Succeeded;
     var canManageUsers = signedIn && (await AuthorizationService.AuthorizeAsync(User, AppPolicies.ManageUsers)).Succeeded;
     var canManagePto = signedIn && (await AuthorizationService.AuthorizeAsync(User, AppPolicies.ManagePto)).Succeeded;
     var canRequestPto = signedIn && (await AuthorizationService.AuthorizeAsync(User, AppPolicies.RequestPto)).Succeeded;
+    var userName = User.Identity?.Name ?? "";
+    var initials = userName.Length == 0 ? "?" : userName[..1].ToUpperInvariant();
+    var role = new[] { AppRoles.SuperAdmin, AppRoles.Admin, AppRoles.TeamLead, AppRoles.Technician }.FirstOrDefault(User.IsInRole);
+    var icons = Url.Content("~/img/icons.svg");
 }
 <!DOCTYPE html>
 <html lang="en">
@@ -20,73 +27,82 @@
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 </head>
-<body>
-    <header>
-        <nav class="navbar navbar-expand-xl navbar-dark app-navbar mb-3">
-            <div class="container-fluid">
-                <a class="navbar-brand fw-semibold" asp-controller="Home" asp-action="Index">Fire Alarm Scheduler</a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav"
-                        aria-controls="mainNav" aria-expanded="false" aria-label="Toggle navigation">
-                    <span class="navbar-toggler-icon"></span>
-                </button>
-                <div class="collapse navbar-collapse" id="mainNav">
-                    <ul class="navbar-nav me-auto">
-                        @if (canManageSchedule)
-                        {
-                            <li class="nav-item"><a class="@NavClass("Home")" asp-controller="Home" asp-action="Index">Dashboard</a></li>
-                            <li class="nav-item"><a class="@NavClass("Schedule")" asp-controller="Schedule" asp-action="Index">Schedule</a></li>
-                            <li class="nav-item"><a class="@NavClass("Jobs")" asp-controller="Jobs" asp-action="Index">Jobs</a></li>
-                            <li class="nav-item"><a class="@NavClass("Technicians")" asp-controller="Technicians" asp-action="Index">Technicians</a></li>
-                        }
-                        @if (signedIn)
-                        {
-                            <li class="nav-item"><a class="@NavClass("TechnicianView")" asp-controller="TechnicianView" asp-action="Index">@(canManageSchedule ? "Technician View" : "My Schedule")</a></li>
-                        }
-                        @if (canRequestPto)
-                        {
-                            <li class="nav-item"><a class="@NavClass("Pto")" asp-controller="Pto" asp-action="Index">My PTO</a></li>
-                        }
-                        @if (canManagePto)
-                        {
-                            <li class="nav-item"><a class="@NavClass("PtoRequests")" asp-controller="PtoRequests" asp-action="Index">PTO Requests</a></li>
-                            <li class="nav-item"><a class="@NavClass("Conflicts")" asp-controller="Conflicts" asp-action="Index">Conflicts</a></li>
-                        }
-                        @if (canManageUsers)
-                        {
-                            <li class="nav-item"><a class="@NavClass("Users")" asp-controller="Users" asp-action="Index">Users</a></li>
-                            <li class="nav-item"><a class="@NavClass("Roles")" asp-controller="Roles" asp-action="Index">Roles</a></li>
-                        }
-                    </ul>
-                    @if (signedIn)
-                    {
-                        @* Account actions sit in a dropdown so the main links fit on one line at laptop widths. *@
-                        <div class="dropdown my-2 my-xl-0">
-                            <button class="btn btn-sm btn-outline-light dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                @User.Identity!.Name
-                            </button>
-                            <ul class="dropdown-menu dropdown-menu-end">
-                                <li><a class="dropdown-item" asp-controller="Account" asp-action="ChangePassword">Change password</a></li>
-                                <li>
-                                    <form asp-controller="Account" asp-action="Logout" method="post">
-                                        <button type="submit" class="dropdown-item">Sign out</button>
-                                    </form>
-                                </li>
-                            </ul>
-                        </div>
-                    }
-                </div>
+<body class="@(signedIn ? "app-signed-in" : "app-signed-out")">
+@if (signedIn)
+{
+    <div class="app-shell">
+        <aside class="app-sidebar offcanvas-lg offcanvas-start" id="appNav" tabindex="-1" aria-label="Main menu">
+            <div class="app-sidebar-head">
+                <a class="app-brand" asp-controller="Home" asp-action="Index">
+                    <svg class="app-icon" aria-hidden="true"><use href="@icons#logo" /></svg>Fire Alarm Scheduler
+                </a>
+                <button type="button" class="btn-close btn-close-white d-lg-none" data-bs-dismiss="offcanvas" data-bs-target="#appNav" aria-label="Close menu"></button>
             </div>
-        </nav>
-    </header>
-    <div class="container">
-        <div class="alert alert-secondary py-1 small" role="note">
-            Prototype for local testing. Do not enter real customer or employee data.
+            <nav class="app-nav">
+                @if (canManageSchedule)
+                {
+                    <a class="@NavClass("Home")" aria-current="@Current("Home")" asp-controller="Home" asp-action="Index"><svg class="app-icon" aria-hidden="true"><use href="@icons#dashboard" /></svg><span>Dashboard</span></a>
+                    <a class="@NavClass("Schedule")" aria-current="@Current("Schedule")" asp-controller="Schedule" asp-action="Index"><svg class="app-icon" aria-hidden="true"><use href="@icons#schedule" /></svg><span>Schedule</span></a>
+                    <a class="@NavClass("Jobs")" aria-current="@Current("Jobs")" asp-controller="Jobs" asp-action="Index"><svg class="app-icon" aria-hidden="true"><use href="@icons#jobs" /></svg><span>Jobs</span></a>
+                    <a class="@NavClass("Technicians")" aria-current="@Current("Technicians")" asp-controller="Technicians" asp-action="Index"><svg class="app-icon" aria-hidden="true"><use href="@icons#technicians" /></svg><span>Technicians</span></a>
+                }
+                <a class="@NavClass("TechnicianView")" aria-current="@Current("TechnicianView")" asp-controller="TechnicianView" asp-action="Index"><svg class="app-icon" aria-hidden="true"><use href="@icons#my-schedule" /></svg><span>@(canManageSchedule ? "Technician View" : "My Schedule")</span></a>
+                @if (canRequestPto)
+                {
+                    <a class="@NavClass("Pto")" aria-current="@Current("Pto")" asp-controller="Pto" asp-action="Index"><svg class="app-icon" aria-hidden="true"><use href="@icons#pto" /></svg><span>My PTO</span></a>
+                }
+                @if (canManagePto)
+                {
+                    <div class="app-nav-group">Time off</div>
+                    <a class="@NavClass("PtoRequests")" aria-current="@Current("PtoRequests")" asp-controller="PtoRequests" asp-action="Index"><svg class="app-icon" aria-hidden="true"><use href="@icons#pto" /></svg><span>PTO Requests</span></a>
+                    <a class="@NavClass("Conflicts")" aria-current="@Current("Conflicts")" asp-controller="Conflicts" asp-action="Index"><svg class="app-icon" aria-hidden="true"><use href="@icons#conflicts" /></svg><span>Conflicts</span></a>
+                }
+                @if (canManageUsers)
+                {
+                    <div class="app-nav-group">Admin</div>
+                    <a class="@NavClass("Users")" aria-current="@Current("Users")" asp-controller="Users" asp-action="Index"><svg class="app-icon" aria-hidden="true"><use href="@icons#users" /></svg><span>Users</span></a>
+                    <a class="@NavClass("Roles")" aria-current="@Current("Roles")" asp-controller="Roles" asp-action="Index"><svg class="app-icon" aria-hidden="true"><use href="@icons#roles" /></svg><span>Roles</span></a>
+                }
+            </nav>
+            <div class="app-account">
+                <div class="app-account-who">
+                    <span class="app-avatar" aria-hidden="true">@initials</span>
+                    <span class="app-account-text"><strong>@userName</strong><span>@role</span></span>
+                </div>
+                <a class="@NavClass("Account")" asp-controller="Account" asp-action="ChangePassword"><svg class="app-icon" aria-hidden="true"><use href="@icons#key" /></svg><span>Change password</span></a>
+                <form asp-controller="Account" asp-action="Logout" method="post">
+                    <button type="submit" class="app-nav-link"><svg class="app-icon" aria-hidden="true"><use href="@icons#sign-out" /></svg><span>Sign out</span></button>
+                </form>
+            </div>
+        </aside>
+        <div class="app-main">
+            <header class="app-topbar d-lg-none">
+                <a class="app-brand" asp-controller="Home" asp-action="Index">
+                    <svg class="app-icon" aria-hidden="true"><use href="@icons#logo" /></svg>Fire Alarm Scheduler
+                </a>
+                <button class="app-menu-button" type="button" data-bs-toggle="offcanvas" data-bs-target="#appNav" aria-controls="appNav" aria-label="Open menu">
+                    <svg class="app-icon" aria-hidden="true"><use href="@icons#menu" /></svg>
+                </button>
+            </header>
+            <main role="main" class="app-content">
+                <div class="app-prototype-note" role="note">Prototype for local testing. Do not enter real customer or employee data.</div>
+                <partial name="_StatusMessages" />
+                @RenderBody()
+            </main>
         </div>
-        <main role="main" class="pb-3">
-            <partial name="_StatusMessages" />
-            @RenderBody()
-        </main>
     </div>
+}
+else
+{
+    <main role="main" class="app-signed-out-page">
+        <div class="app-brand app-brand-large">
+            <svg class="app-icon" aria-hidden="true"><use href="@icons#logo" /></svg>Fire Alarm Scheduler
+        </div>
+        <partial name="_StatusMessages" />
+        @RenderBody()
+        <div class="app-prototype-note mt-4" role="note">Prototype for local testing. Do not enter real customer or employee data.</div>
+    </main>
+}
 
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>

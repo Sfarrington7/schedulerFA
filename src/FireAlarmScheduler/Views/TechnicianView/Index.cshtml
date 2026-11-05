@@ -87,7 +87,7 @@
         @foreach (var day in Model.Days)
         {
             <section class="schedule-day mb-3 @(day.Date == Model.Today ? "is-today" : "")">
-                <h3 class="h6 mb-1 @(day.Date == Model.Today ? "text-danger" : "")">@day.Date.ToString("dddd, MMM d")@(day.Date == Model.Today ? " (today)" : "")</h3>
+                <h3 class="h6 mb-1 @(day.Date == Model.Today ? "text-primary" : "")">@day.Date.ToString("dddd, MMM d")@(day.Date == Model.Today ? " (today)" : "")</h3>
                 @foreach (var pto in day.TimeOff)
                 {
                     <div class="pto-entry rounded px-2 py-1 mb-1 small"><strong>Approved PTO</strong> · @pto.HoursText</div>

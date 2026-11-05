@@ -17,7 +17,18 @@ The login needs permission to create and drop databases. From the repository roo
 dotnet test
 ```
 
-The full suite takes about a minute and a half, mostly creating databases.
+The full suite takes about two and a half minutes, mostly creating databases.
+
+### Browser layout tests
+
+`Visual/LayoutTests.cs` opens every page in headless **Chromium** through Microsoft.Playwright at desktop, tablet, and phone sizes. Playwright needs its own copy of Chromium. Install it once after building the tests:
+
+```bash
+dotnet build
+pwsh tests/FireAlarmScheduler.Tests/bin/Debug/net10.0/playwright.ps1 install chromium
+```
+
+(`pwsh` is PowerShell 7; on Windows the same command works in a PowerShell window.) If Chromium isn't installed, these tests are **skipped** with that instruction, and the rest of the suite still runs. Run only the layout tests with `dotnet test --filter "FullyQualifiedName~Visual"`. Each run saves a full-page screenshot of every page to `tests/FireAlarmScheduler.Tests/bin/Debug/net10.0/layout-screenshots/<desktop|tablet|phone>/` for a quick look.
 
 Run one class or test by name:
 
@@ -33,6 +44,7 @@ dotnet test --filter "FullyQualifiedName~BuildingFileServiceTests"
 - Integration tests host the real app in memory with `WebApplicationFactory` (`TestSupport/AppFactory.cs`). They point the connection string at the test database and `Storage:UploadsDirectory` at the temp folder, set a 1 KB upload limit, and fix the clock to **Nov 3, 2026** so date-based pages are predictable.
 - `AppFactory.CreateUserAsync` adds an account with a role directly; `SignInAsync` / `SignInAsNewUserAsync` sign in through the real login form and return a client holding the auth cookie. All test accounts use `AppFactory.TestPassword`.
 - `TestSupport/FormPoster.cs` submits forms like a browser does, by reading the page's antiforgery token first.
+- Browser layout tests (`TestSupport/VisualTestApp.cs`) run the real app on a free local port with Kestrel instead of in memory, over their own test database seeded with a November 2026 schedule (four technicians, a recurring job with buildings and a spreadsheet, a double booking, a job during approved PTO, a pending request). They sign in once as a SuperAdmin and once as a technician through the real login form and reuse those cookies. Each viewport class has its own app, database, and browser.
 
 ## What each file covers
 
@@ -47,6 +59,7 @@ dotnet test --filter "FullyQualifiedName~BuildingFileServiceTests"
 | `Services/ScheduleCalendarTests.cs` | Monday-based week start, including year boundaries; inclusive day ranges; month grids (6-row month starting Sunday, 4-row February starting Monday); start of month |
 | `Integration/PageTests.cs` | Every main page loads for a team lead with navigation; unknown IDs return 404; posts without an antiforgery token are rejected; form validation errors are shown |
 | `Integration/WorkflowTests.cs` | The full README workflow over HTTP (team lead adds 3 technicians, job, 2 assignments, 3 buildings, per-building uploads; John signs in as a technician and downloads; Sara's account can't see or download John's job); mixed valid/invalid uploads; job date validation; editing assignments and status; deleting files and jobs; weekly grid; remembered technician selection |
+| `Visual/LayoutTests.cs` | Every page (33, signed out, as a SuperAdmin, and as a technician) at desktop 1366×900, tablet 820×1180, and phone 390×844: loads with no script errors, console errors, or missing files; no sideways scrolling; nothing running off the screen (except inside scrolling tables and calendars); no overlapping links, buttons, or fields; no text under 10px; no text cut off without an ellipsis; the sidebar beside the content on desktop and hidden behind a 44px menu button on narrower screens. Also: the desktop sidebar stays in view on a long scrolled page; on a phone the menu opens on screen, navigates, and closes; the job form's technician dropdown fits a phone screen |
 | `Integration/JobsCalendarTests.cs` | Jobs page calendar: every job in the month (assigned or not) as one colored bar at the right column and length, no technician tags, a job running into the next month continuing across rows, the month's job list with color swatches and day counts, month links, default month and an empty month, the List/Calendar tabs, technicians denied |
 | `Integration/MonthScheduleTests.cs` | Team lead month calendar: all technicians by default, any chosen subset (only their jobs and initials), none chosen, unknown IDs ignored, Next keeps the choice, defaults to the current month, technicians denied; technician month view shows only their own jobs with job and day links, leading days from the previous month stay off the month's job list; week view lists every day including empty ones |
 | `Services/PtoServiceTests.cs` | Submitting PTO (saved as pending across a restart, today allowed, end before start, zero length, past start, long reason, unknown technician, overlap with own active request; touching, denied, and other technicians' requests allowed); cancelling (own pending only); approve/deny/revoke with reviewer recorded; pending-first sort; approved requests in a date range; deleting a technician removes their requests |
@@ -65,7 +78,7 @@ dotnet test --filter "FullyQualifiedName~BuildingFileServiceTests"
 
 ## Gaps and manual checks
 
-- Views are checked through HTML content, not visual layout. After UI changes, run the app and check pages at desktop and phone widths.
+- The layout tests catch broken layout (overflow, overlap, tiny or cut-off text, wrong navigation), not taste: colors, spacing, and alignment still need a look. After UI changes, skim the saved `layout-screenshots`. Pages are checked as loaded; open menus and dropdowns are only checked by the dedicated tests above.
 - If a test run is killed midway, leftover `FasTest_*` databases can be dropped by hand.
 - The ~1-minute delay before role changes reach an already signed-in session (security-stamp validation interval) isn't tested; tests sign in again after changes.
 - The technician picker's script (`wwwroot/js/technician-picker.js`: refreshing the marks when dates change, the selected-names summary, and the warning list) has no automated test; check it in a browser.

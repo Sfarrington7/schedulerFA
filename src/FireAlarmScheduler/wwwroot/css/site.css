@@ -1,6 +1,37 @@
-/* Site-wide styles: a plain industrial look on top of Bootstrap, readable on phones. */
+/* Site-wide look ("Clean Slate"): slate neutrals, one blue accent, white cards on a light background, and a dark
+   sidebar that becomes a slide-out menu below 992px. Bootstrap supplies the components (left on its white
+   --bs-body-bg, while the page itself is light slate); these rules restyle them,
+   followed by the app's own calendar, schedule, PTO, conflict, and job-form styles. */
 :root {
-  --app-accent: #b3261e;
+  --app-accent: #2563eb;
+  --app-accent-hover: #1d4ed8;
+  --app-accent-soft: #eff6ff;
+  --app-accent-line: #bfdbfe;
+  --app-bg: #f8fafc;
+  --app-text: #0f172a;
+  --app-muted: #64748b;
+  --app-line: #e2e8f0;
+  --app-line-strong: #cbd5e1;
+  --app-nav-bg: #0f172a;
+  --app-nav-text: #cbd5e1;
+  --app-nav-hover: #16213a;
+  --app-nav-active: #1e293b;
+  --app-today: #f5f9ff;
+  --app-radius: 10px;
+  --app-radius-sm: 7px;
+  --app-shadow: 0 1px 2px rgba(15, 23, 42, .05);
+  --app-sidebar-width: 15rem;
+
+  --bs-body-font-family: Inter, "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
+  --bs-body-color: var(--app-text);
+  --bs-secondary-color: var(--app-muted);
+  --bs-border-color: var(--app-line);
+  --bs-border-radius: var(--app-radius-sm);
+  --bs-border-radius-lg: var(--app-radius);
+  --bs-link-color-rgb: 37, 99, 235;
+  --bs-link-hover-color-rgb: 29, 78, 216;
+  --bs-primary-rgb: 37, 99, 235;
+  --bs-focus-ring-color: rgba(37, 99, 235, .25);
 }
 
 html {
@@ -14,36 +45,499 @@ html {
 }
 
 body {
-  background-color: #f4f5f7;
+  background-color: var(--app-bg);
+  -webkit-font-smoothing: antialiased;
 }
 
-.app-navbar {
-  background-color: #23272b;
-  border-bottom: 4px solid var(--app-accent);
+a {
+  text-decoration: none;
 }
 
-.app-navbar .nav-link.active {
+a:hover {
+  text-decoration: underline;
+}
+
+/* Layout: sidebar beside the page on desktop; a sticky top bar with a menu button on phones and tablets. */
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.app-icon {
+  width: 1.15rem;
+  height: 1.15rem;
+  flex-shrink: 0;
+}
+
+.app-brand {
+  display: flex;
+  align-items: center;
+  gap: .55rem;
+  font-weight: 800;
+  font-size: 1.05rem;
+  letter-spacing: -.01em;
   color: #fff;
-  border-bottom: 2px solid #fff;
 }
 
-.card {
-  box-shadow: 0 1px 2px rgba(0, 0, 0, .06);
+.app-brand:hover {
+  color: #fff;
+  text-decoration: none;
+}
+
+/* Bootstrap paints offcanvas-lg transparent (!important) at desktop widths, so the sidebar color needs !important too. */
+.app-sidebar {
+  --bs-offcanvas-width: 17rem;
+  display: flex;
+  flex-direction: column;
+  color: var(--app-nav-text);
+  background-color: var(--app-nav-bg) !important;
+}
+
+@media (min-width: 992px) {
+  .app-sidebar {
+    position: sticky;
+    top: 0;
+    width: var(--app-sidebar-width);
+    height: 100vh;
+    flex-shrink: 0;
+    overflow-y: auto;
+  }
+}
+
+.app-sidebar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.3rem 1.1rem 1rem;
+}
+
+.app-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 .75rem;
+}
+
+.app-nav-group {
+  padding: 1rem .7rem .3rem;
+  font-size: .7rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.app-nav-link {
+  display: flex;
+  align-items: center;
+  gap: .7rem;
+  width: 100%;
+  padding: .55rem .7rem;
+  border: 0;
+  border-radius: var(--app-radius-sm);
+  background: none;
+  color: var(--app-nav-text);
+  font-size: .92rem;
+  text-align: left;
+}
+
+.app-nav-link .app-icon {
+  opacity: .7;
+}
+
+.app-nav-link:hover {
+  background-color: var(--app-nav-hover);
+  color: #fff;
+  text-decoration: none;
+}
+
+.app-nav-link.active {
+  background-color: var(--app-nav-active);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: inset 3px 0 0 var(--app-accent);
+}
+
+.app-nav-link.active .app-icon {
+  opacity: 1;
+  color: #60a5fa;
+}
+
+.app-account {
+  margin-top: auto;
+  padding: .9rem .75rem 1rem;
+  border-top: 1px solid var(--app-nav-active);
+}
+
+.app-account-who {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  min-width: 0;
+  padding: .2rem .7rem .6rem;
+}
+
+.app-avatar {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background-color: var(--app-accent);
+  color: #fff;
+  font-size: .85rem;
+  font-weight: 700;
+}
+
+.app-account-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.3;
+}
+
+.app-account-text strong {
+  overflow: hidden;
+  color: #fff;
+  font-size: .85rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-account-text span {
+  font-size: .75rem;
+}
+
+.app-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.app-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 1020;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: .7rem 1rem;
+  background-color: var(--app-nav-bg);
+}
+
+/* 44px square: a comfortable tap target. */
+.app-menu-button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-right: -.5rem;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: #fff;
+}
+
+.app-menu-button .app-icon {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.app-content {
+  width: 100%;
+  max-width: 92rem;
+  padding: 1.5rem 2rem 2.5rem;
+}
+
+@media (max-width: 991.98px) {
+  .app-content {
+    padding: 1rem 1rem 2rem;
+  }
+}
+
+.app-prototype-note {
+  display: inline-block;
+  margin-bottom: 1.25rem;
+  padding: .3rem .7rem;
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-radius-sm);
+  background-color: #f1f5f9;
+  color: var(--app-muted);
+  font-size: .78rem;
+}
+
+/* Signed out: sign-in and first-run setup in a narrow centered column. */
+.app-signed-out-page {
+  max-width: 30rem;
+  margin: 0 auto;
+  padding: 4rem 1rem 2rem;
+}
+
+.app-brand-large {
+  justify-content: center;
+  margin-bottom: 1.75rem;
+  color: var(--app-text);
+  font-size: 1.35rem;
+}
+
+.app-brand-large .app-icon {
+  width: 1.6rem;
+  height: 1.6rem;
+  color: var(--app-accent);
+}
+
+/* Headings: page titles are bold and tight; most views use h1.h3. */
+h1, .h1, h2, .h2, h1.h3 {
+  font-weight: 700;
+  letter-spacing: -.02em;
+}
+
+h1.h3 {
+  font-size: 1.6rem;
+}
+
+@media (max-width: 767.98px) {
+  h1.h3 {
+    font-size: 1.35rem;
+  }
+}
+
+/* Buttons. */
+.btn {
+  --bs-btn-font-weight: 600;
+  --bs-btn-font-size: .9rem;
+  --bs-btn-padding-x: .9rem;
+  --bs-btn-padding-y: .45rem;
+  --bs-btn-border-radius: var(--app-radius-sm);
+}
+
+.btn-sm {
+  --bs-btn-font-size: .8rem;
+  --bs-btn-padding-x: .65rem;
+  --bs-btn-padding-y: .3rem;
 }
 
 .btn-primary {
-  background-color: var(--app-accent);
-  border-color: var(--app-accent);
+  --bs-btn-bg: var(--app-accent);
+  --bs-btn-border-color: var(--app-accent);
+  --bs-btn-hover-bg: var(--app-accent-hover);
+  --bs-btn-hover-border-color: var(--app-accent-hover);
+  --bs-btn-active-bg: #1e40af;
+  --bs-btn-active-border-color: #1e40af;
+  --bs-btn-disabled-bg: var(--app-accent);
+  --bs-btn-disabled-border-color: var(--app-accent);
+  --bs-btn-focus-shadow-rgb: 37, 99, 235;
 }
 
-.btn-primary:hover,
-.btn-primary:focus {
-  background-color: #8f1e18;
-  border-color: #8f1e18;
+.btn-outline-secondary,
+.btn-outline-dark {
+  --bs-btn-color: var(--app-text);
+  --bs-btn-bg: #fff;
+  --bs-btn-border-color: var(--app-line-strong);
+  --bs-btn-hover-color: var(--app-text);
+  --bs-btn-hover-bg: #f1f5f9;
+  --bs-btn-hover-border-color: var(--app-line-strong);
+  --bs-btn-active-color: #fff;
+  --bs-btn-active-bg: var(--app-nav-bg);
+  --bs-btn-active-border-color: var(--app-nav-bg);
+}
+
+.btn-dark {
+  --bs-btn-bg: var(--app-nav-bg);
+  --bs-btn-border-color: var(--app-nav-bg);
+  --bs-btn-hover-bg: var(--app-nav-active);
+  --bs-btn-hover-border-color: var(--app-nav-active);
+}
+
+.btn-outline-danger {
+  --bs-btn-bg: #fff;
+  --bs-btn-border-color: #fecaca;
+}
+
+.btn-success {
+  --bs-btn-bg: #16a34a;
+  --bs-btn-border-color: #16a34a;
+  --bs-btn-hover-bg: #15803d;
+  --bs-btn-hover-border-color: #15803d;
+}
+
+/* Cards, lists, and tables. */
+.card {
+  --bs-card-border-color: var(--app-line);
+  --bs-card-border-radius: var(--app-radius);
+  --bs-card-inner-border-radius: calc(var(--app-radius) - 1px);
+  --bs-card-cap-bg: #fff;
+  --bs-card-cap-padding-y: .85rem;
+  --bs-card-cap-padding-x: 1.1rem;
+  --bs-card-spacer-x: 1.1rem;
+  box-shadow: var(--app-shadow);
+}
+
+.card-header {
+  font-weight: 700;
+}
+
+.list-group {
+  --bs-list-group-border-color: var(--app-line);
+  --bs-list-group-border-radius: var(--app-radius);
+  --bs-list-group-item-padding-x: 1.1rem;
+  --bs-list-group-item-padding-y: .8rem;
+  --bs-list-group-action-hover-bg: #f8fafc;
 }
 
 .job-item {
   border-left: 4px solid var(--app-accent);
+}
+
+.table {
+  --bs-table-bg: transparent;
+  --bs-table-border-color: var(--app-line);
+  --bs-table-hover-bg: #f8fafc;
+}
+
+.table > :not(caption) > * > * {
+  padding: .7rem .9rem;
+}
+
+.table > thead th {
+  background-color: #f8fafc;
+  color: var(--app-muted);
+  font-size: .75rem;
+  font-weight: 600;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* Header labels are already small; don't shrink their secondary lines further. */
+.table > thead .small {
+  font-size: 1em;
+}
+
+.card > .table > :not(caption) > * > :first-child,
+.card > .table-responsive > .table > :not(caption) > * > :first-child {
+  padding-left: 1.1rem;
+}
+
+.card > .table > :not(caption) > * > :last-child,
+.card > .table-responsive > .table > :not(caption) > * > :last-child {
+  padding-right: 1.1rem;
+}
+
+.card > .table:first-child > thead th:first-child,
+.card > .table-responsive:first-child > .table > thead th:first-child {
+  border-top-left-radius: var(--bs-card-inner-border-radius);
+}
+
+.card > .table:first-child > thead th:last-child,
+.card > .table-responsive:first-child > .table > thead th:last-child {
+  border-top-right-radius: var(--bs-card-inner-border-radius);
+}
+
+.table-sm > :not(caption) > * > * {
+  padding: .45rem .6rem;
+}
+
+/* Status labels: soft colored pills instead of solid blocks. */
+.badge {
+  --bs-badge-font-weight: 600;
+  --bs-badge-padding-x: .6em;
+  --bs-badge-padding-y: .35em;
+  border-radius: 999px;
+  /* Never below 10.5px, even inside small print. */
+  font-size: max(.75em, .7rem);
+}
+
+.badge.text-bg-primary { color: #1d4ed8 !important; background-color: #eff6ff !important; }
+.badge.text-bg-success { color: #15803d !important; background-color: #dcfce7 !important; }
+.badge.text-bg-warning { color: #b45309 !important; background-color: #fef3c7 !important; }
+.badge.text-bg-danger { color: #b91c1c !important; background-color: #fee2e2 !important; }
+.badge.text-bg-info { color: #0369a1 !important; background-color: #e0f2fe !important; }
+.badge.text-bg-secondary,
+.badge.text-bg-light { color: #475569 !important; background-color: #f1f5f9 !important; }
+.badge.text-bg-dark { color: #fff !important; background-color: var(--app-nav-bg) !important; }
+
+/* Forms. */
+.form-label {
+  font-size: .875rem;
+  font-weight: 600;
+}
+
+.form-control,
+.form-select {
+  padding: .5rem .75rem;
+  border-color: var(--app-line-strong);
+  border-radius: var(--app-radius-sm);
+}
+
+.form-control:focus,
+.form-select:focus {
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 3px #dbeafe;
+}
+
+.form-check-input:checked {
+  border-color: var(--app-accent);
+  background-color: var(--app-accent);
+}
+
+.form-check-input:focus {
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 3px #dbeafe;
+}
+
+.form-text {
+  color: var(--app-muted);
+}
+
+/* Tabs: an underline under the current tab rather than a boxed tab. */
+.nav-tabs {
+  --bs-nav-tabs-border-color: var(--app-line);
+  gap: .25rem;
+}
+
+.nav-tabs .nav-link {
+  margin-bottom: -1px;
+  padding: .55rem .9rem;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--app-muted);
+  font-weight: 500;
+}
+
+.nav-tabs .nav-link:hover {
+  color: var(--app-text);
+  text-decoration: none;
+}
+
+.nav-tabs .nav-link.active {
+  border-bottom-color: var(--app-accent);
+  background: none;
+  color: var(--app-text);
+  font-weight: 600;
+}
+
+/* Alerts and menus. */
+.alert {
+  --bs-alert-border-radius: var(--app-radius);
+  font-size: .925rem;
+}
+
+.dropdown-menu {
+  --bs-dropdown-border-color: var(--app-line);
+  --bs-dropdown-border-radius: var(--app-radius);
+  --bs-dropdown-link-active-bg: var(--app-accent);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, .12);
+}
+
+/* Dashboard: today's row in the next-14-days table. */
+.table-today > * {
+  --bs-table-bg-state: var(--app-today);
+  font-weight: 600;
 }
 
 /* Weekly grid: keep day columns narrow so the whole week fits on a laptop; scroll on phones. */
@@ -54,22 +548,23 @@ body {
 }
 
 .schedule-grid .today {
-  background-color: #fff6e5;
+  background-color: var(--app-today);
 }
 
 .schedule-chip {
   display: block;
-  padding: .15rem .35rem;
+  padding: .2rem .4rem;
   margin-bottom: .25rem;
   font-size: .8rem;
-  border-radius: .25rem;
-  background-color: #e9ecef;
+  border-radius: 6px;
+  background-color: #eef2f7;
   color: inherit;
   text-decoration: none;
 }
 
 .schedule-chip:hover {
-  background-color: #dee2e6;
+  background-color: #e2e8f0;
+  text-decoration: none;
 }
 
 /* Large tap targets for file downloads in the field. */
@@ -80,10 +575,6 @@ body {
 /* Keep line breaks typed into notes fields. */
 .notes {
   white-space: pre-line;
-}
-
-.app-navbar .nav-link {
-  white-space: nowrap;
 }
 
 /* Month calendar: fixed-width day columns; names shrink to dots on phones so a whole month fits. */
@@ -110,7 +601,12 @@ body {
 }
 
 .month-calendar td.today {
-  background-color: #fff6e5;
+  background-color: var(--app-today);
+}
+
+.month-calendar td.today .day-number,
+.jobs-calendar-day.today .day-number {
+  color: var(--app-accent);
 }
 
 .month-calendar .day-number {
@@ -128,7 +624,7 @@ body {
   font-size: .75rem;
   line-height: 1.3;
   border-radius: .25rem;
-  background-color: #e9ecef;
+  background-color: #eef2f7;
   color: inherit;
   text-decoration: none;
   white-space: nowrap;
@@ -137,7 +633,8 @@ body {
 }
 
 .calendar-entry:hover {
-  background-color: #dee2e6;
+  background-color: #e2e8f0;
+  text-decoration: none;
 }
 
 .calendar-dot {
@@ -195,7 +692,7 @@ body {
   }
 
   .calendar-entry .tech-tag {
-    font-size: .6rem;
+    font-size: .7rem;
   }
 }
 
@@ -262,13 +759,14 @@ body {
 
 /* Create Job: the recurring-job picker stands out as the first choice on the form. */
 .recurring-picker {
-  background-color: #eef4fb;
-  border: 1px solid #cfe0f3;
+  background-color: var(--app-accent-soft);
+  border: 1px solid var(--app-accent-line);
 }
 
 /* Create Job: names of buildings from a recurring job are read-only. */
 .building-row input[readonly] {
-  background-color: #e9ecef;
+  background-color: #f1f5f9;
+  color: #475569;
   cursor: not-allowed;
 }
 
@@ -324,20 +822,22 @@ body {
 }
 
 .technician-choice[data-status="free"] .technician-status {
-  background-color: #198754;
+  background-color: #dcfce7;
+  color: #15803d;
 }
 
 .technician-choice[data-status="conflict"] {
-  border-left-color: #ffc107;
+  border-left-color: #f59e0b;
 }
 
 .technician-choice[data-status="conflict"] .technician-status {
-  background-color: #ffc107;
-  color: #000;
+  background-color: #fef3c7;
+  color: #b45309;
 }
 
 .technician-choice[data-status="unknown"] .technician-status {
-  background-color: #6c757d;
+  background-color: #f1f5f9;
+  color: #475569;
 }
 
 /* Jobs calendar: each week row is a 7-column grid. Day cells fill every line of the row; each job is one solid
@@ -382,7 +882,7 @@ body {
 }
 
 .jobs-calendar-day.today {
-  background-color: #fff6e5;
+  background-color: var(--app-today);
 }
 
 .jobs-calendar-day .day-number {
@@ -432,16 +932,16 @@ body {
   vertical-align: -.05rem;
 }
 
-.job-color-0 { background-color: #1f6feb; }
-.job-color-1 { background-color: #c2410c; }
-.job-color-2 { background-color: #15803d; }
-.job-color-3 { background-color: #7c3aed; }
-.job-color-4 { background-color: #be123c; }
+.job-color-0 { background-color: #2563eb; }
+.job-color-1 { background-color: #0f766e; }
+.job-color-2 { background-color: #7c3aed; }
+.job-color-3 { background-color: #be185d; }
+.job-color-4 { background-color: #c2410c; }
 .job-color-5 { background-color: #0e7490; }
-.job-color-6 { background-color: #a16207; }
-.job-color-7 { background-color: #4338ca; }
-.job-color-8 { background-color: #be185d; }
-.job-color-9 { background-color: #4b5563; }
+.job-color-6 { background-color: #4d7c0f; }
+.job-color-7 { background-color: #4f46e5; }
+.job-color-8 { background-color: #a21caf; }
+.job-color-9 { background-color: #475569; }
 
 @media (max-width: 767.98px) {
   .jobs-calendar-week {
@@ -451,6 +951,6 @@ body {
   .job-bar {
     margin: 0 .1rem;
     padding: 0 .25rem;
-    font-size: .65rem;
+    font-size: .7rem;
   }
 }

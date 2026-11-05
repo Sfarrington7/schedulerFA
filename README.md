@@ -41,7 +41,8 @@ Self-service registration, password-reset emails, two-factor sign-in, multi-comp
 | Data persistence | EF Core 10 with SQL Server on `localhost` (database `FireAlarmScheduler`), schema managed by migrations |
 | Accounts and roles | ASP.NET Core Identity (MVC screens, no Razor Pages UI) |
 | Uploaded documents | Local filesystem, outside `wwwroot` |
-| Testing | xUnit (`dotnet test`) |
+| Look and feel | Bootstrap 5.3 restyled by `wwwroot/css/site.css` ("Clean Slate": dark sidebar, slate neutrals, blue accent); line icons in `wwwroot/img/icons.svg` |
+| Testing | xUnit (`dotnet test`); browser layout tests with Microsoft.Playwright (headless Chromium) |
 | Deployment | Local development only, initially |
 
 Services depend on repository interfaces, so the database provider can change (for example to SQL Server) without touching controllers or views.
@@ -72,7 +73,7 @@ schedulerFA/
 │   ├── Entities/                     # Technician, Job, JobAssignment, Building, UploadedFile, ApplicationUser (SQL tables)
 │   ├── Data/                         # AppDbContext, startup migration/role seeding, Migrations/
 │   ├── Services/                     # Business rules, EF Core repositories, account rules, local file storage
-│   ├── wwwroot/                      # CSS and Bootstrap/jQuery (public static files only)
+│   ├── wwwroot/                      # CSS, scripts, icons, and Bootstrap/jQuery (public static files only)
 │   └── App_Data/                     # Created at runtime; ignored by Git (see below)
 └── tests/
     ├── README.md                     # How to run tests and what each file covers
@@ -191,6 +192,7 @@ Key expectations:
 ## Progress and decisions
 
 - **Current milestone:** Steps 1–7 complete. Next: usability fixes from real use.
+- **Decision (look and feel):** The site uses the "Clean Slate" design. Signed in, a dark sidebar lists the pages the account's role can open, grouped into the main pages, "Time off" (PTO Requests, Conflicts) and "Admin" (Users, Roles), with the account, Change password and Sign out at its foot. Below 992px wide (phones and most tablets) the sidebar is hidden behind a menu button in a top bar and slides in over the page. Signed out, sign-in and setup show in a narrow centered column. The look comes from one stylesheet over Bootstrap: components keep Bootstrap's markup and are restyled (soft colored status pills, underlined tabs, white cards on a light slate page, uppercase table headers), so views needed almost no changes. Fonts use the system stack (Inter or Segoe UI where installed), with no web fonts or icon libraries downloaded. Text is never below 10.5px on phones, and the phone menu button is a 44px tap target.
 - **Decision (PTO):** A request is one continuous period from a start date/time to an end date/time; whole days default to 12:00 AM–11:59 PM. Requests can't start before today or overlap the technician's own pending or approved requests. Technicians can cancel only pending requests (cancelling deletes them); admins can approve, deny, or revoke (deny an approved request). Team leads, Admins, and SuperAdmins review PTO and see the Conflicts page. Approved PTO does not block assigning the technician to a job; it shows up on the Conflicts page instead.
 - **Decision (PTO on calendars):** Approved PTO shows as a striped "PTO" block on the team lead's Week grid and Month calendar (only for ticked technicians, with their colored initials) and on a technician's Day, Week, and Month views. Partial days show their hours ("From 12:00 PM", "Until 10:30 AM", or a range); time off that runs to 11:59 PM or past midnight counts as the rest of the day. Pending and denied requests are never shown on calendars.
 - **Decision (recurring jobs):** A recurring job (`RecurringJobs`) stores name, customer, site, and address plus a standing building list (`RecurringJobBuildings`); jobs link to it with `Jobs.RecurringJobId`. A new job in the series starts with that list. On the Create form those rows' names are read-only, and the server enforces it: each such row carries its recurring building's ID and is saved under the saved name, whatever name is posted. Rows can still be removed for one round, given notes, or added. Adding a building to any job in the series, or on the recurring job's page, adds it to the list (if the name isn't already there) and to the series' upcoming jobs (start date after today, not completed). Renaming a building on a series job renames it on the list. Removing a building from one job doesn't change the list (a building can be skipped for one round); remove it on the recurring job's page to stop including it. Spreadsheets are never copied. The saved details follow the newest job in the series. Recurring job names must be unique. The `AddRecurringJobBuildings` migration seeds each existing list from that series' newest job.
