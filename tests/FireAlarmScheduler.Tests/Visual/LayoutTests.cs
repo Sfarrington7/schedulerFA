@@ -239,6 +239,23 @@ public sealed class DesktopLayoutTests(VisualTestApp app) : LayoutTests(app, "de
         Assert.True(await page.GetByRole(AriaRole.Link, new() { Name = "Sign out" }).CountAsync() == 0, "Sign out is a button.");
         Assert.True(await page.GetByRole(AriaRole.Button, new() { Name = "Sign out" }).IsVisibleAsync());
     }
+
+    [VisualFact]
+    public async Task SignInLogo_Hovered_LooksTheSame()
+    {
+        await using var context = await NewContextAsync("");
+        var page = await context.NewPageAsync();
+        await page.GotoAsync(App.Url("/Account/Login"));
+        var logo = page.Locator(".app-brand-large");
+        const string colors = "el => getComputedStyle(el).color + ' ' + getComputedStyle(el.querySelector('svg')).color";
+
+        var before = await logo.EvaluateAsync<string>(colors);
+        await logo.HoverAsync();
+        var after = await logo.EvaluateAsync<string>(colors);
+
+        Assert.Equal(before, after);
+        Assert.Equal("rgb(15, 23, 42) rgb(37, 99, 235)", after);
+    }
 }
 
 public sealed class TabletLayoutTests(VisualTestApp app) : LayoutTests(app, "tablet", 820, 1180), IClassFixture<VisualTestApp>;
