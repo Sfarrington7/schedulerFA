@@ -1,4 +1,4 @@
-@* Shared create/edit form for a job: recurring-job choice, details, buildings (create only), schedule, status, notes,
+@* Shared create/edit form for a job: recurring-job choice, details, job files link, buildings (create only), schedule, status, notes,
    and the technician picker, which flags technicians who would have a scheduling conflict. On create, picking a recurring job reloads the form with its details and building list. *@
 @model JobFormModel
 <div asp-validation-summary="ModelOnly" class="text-danger"></div>
@@ -75,6 +75,13 @@
         <label asp-for="Address" class="form-label"></label>
         <input asp-for="Address" class="form-control" />
         <span asp-validation-for="Address" class="text-danger small"></span>
+    </div>
+    <div class="col-12">
+        <label asp-for="FilesUrl" class="form-label"></label>
+        <input asp-for="FilesUrl" type="text" inputmode="url" autocomplete="off" spellcheck="false" class="form-control"
+               placeholder="https://drive.google.com/drive/folders/…" aria-describedby="files-url-help" />
+        <div class="form-text" id="files-url-help">Paste a link to this job's files, such as a shared Google Drive folder. Technicians open it from their job page, so make sure they have access to it.</div>
+        <span asp-validation-for="FilesUrl" class="text-danger small"></span>
     </div>
     @if (Model.IsNew)
     {

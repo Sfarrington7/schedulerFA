@@ -7,7 +7,6 @@ using FireAlarmScheduler.Services;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 
 namespace FireAlarmScheduler.Tests.TestSupport;
 
@@ -15,10 +14,8 @@ public sealed class ServiceHarness
 {
     public static readonly DateTimeOffset Now = new(2026, 11, 3, 15, 0, 0, TimeSpan.Zero);
 
-    public ServiceHarness(string rootDirectory, long maxFileSizeBytes = 1024)
+    public ServiceHarness(string rootDirectory)
     {
-        UploadsDirectory = Path.Combine(rootDirectory, "uploads");
-
         var connectionString = TestDatabase.ConnectionStringFor(TestDatabase.NameFor(rootDirectory));
         var services = new ServiceCollection();
         services.AddLogging();
@@ -43,32 +40,26 @@ public sealed class ServiceHarness
         Jobs = provider.GetRequiredService<IJobRepository>();
         PtoRequests = provider.GetRequiredService<IPtoRepository>();
         RecurringJobRepository = provider.GetRequiredService<IRecurringJobRepository>();
-        FileStorage = new LocalFileStorage(UploadsDirectory);
         UserManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         UserAdmin = scope.ServiceProvider.GetRequiredService<UserAdministrationService>();
 
         TechnicianService = new TechnicianService(Technicians);
         RecurringJobService = new RecurringJobService(RecurringJobRepository, Jobs);
-        JobService = new JobService(Jobs, Technicians, FileStorage, RecurringJobService, new FixedTimeProvider(Now));
+        JobService = new JobService(Jobs, Technicians, RecurringJobService, new FixedTimeProvider(Now));
         PtoService = new PtoService(PtoRequests, Technicians, new FixedTimeProvider(Now));
         ConflictService = new ScheduleConflictService(Jobs, PtoRequests);
-        FileService = new BuildingFileService(Jobs, FileStorage,
-            Options.Create(new StorageOptions { MaxFileSizeBytes = maxFileSizeBytes }), new FixedTimeProvider(Now));
     }
 
-    public string UploadsDirectory { get; }
     public IDbContextFactory<AppDbContext> ContextFactory { get; }
     public ITechnicianRepository Technicians { get; }
     public IJobRepository Jobs { get; }
     public IPtoRepository PtoRequests { get; }
     public IRecurringJobRepository RecurringJobRepository { get; }
     public RecurringJobService RecurringJobService { get; }
-    public IFileStorage FileStorage { get; }
     public UserManager<ApplicationUser> UserManager { get; }
     public UserAdministrationService UserAdmin { get; }
     public TechnicianService TechnicianService { get; }
     public JobService JobService { get; }
-    public BuildingFileService FileService { get; }
     public PtoService PtoService { get; }
     public ScheduleConflictService ConflictService { get; }
 

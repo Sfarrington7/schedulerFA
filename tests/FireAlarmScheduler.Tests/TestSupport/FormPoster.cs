@@ -1,5 +1,5 @@
 // Purpose: Submits forms the way a browser would: loads the page to get its antiforgery token,
-// then posts fields (or files) with that token.
+// then posts fields with that token (optionally asking for JSON, as the checklist script does).
 using System.Net.Http.Headers;
 using System.Text.RegularExpressions;
 
@@ -25,19 +25,19 @@ public static partial class FormPoster
         return await client.PostAsync(postUrl, content);
     }
 
-    public static async Task<HttpResponseMessage> PostFilesAsync(HttpClient client, string pageUrl, string postUrl,
-        params (string FileName, byte[] Bytes)[] files)
+    /// <summary>Posts form fields the way the building checklist script does, asking for a JSON answer.</summary>
+    public static async Task<HttpResponseMessage> PostFormForJsonAsync(HttpClient client, string pageUrl, string postUrl,
+        params (string Name, string Value)[] fields)
     {
         var token = await GetAntiforgeryTokenAsync(client, pageUrl);
-        using var content = new MultipartFormDataContent { { new StringContent(token), "__RequestVerificationToken" } };
-        foreach (var (fileName, bytes) in files)
+        using var request = new HttpRequestMessage(HttpMethod.Post, postUrl)
         {
-            var part = new ByteArrayContent(bytes);
-            part.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
-            content.Add(part, "files", fileName);
-        }
-
-        return await client.PostAsync(postUrl, content);
+            Content = new FormUrlEncodedContent(
+                fields.Select(f => new KeyValuePair<string, string>(f.Name, f.Value))
+                      .Append(new("__RequestVerificationToken", token)))
+        };
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        return await client.SendAsync(request);
     }
 
     [GeneratedRegex("name=\"__RequestVerificationToken\" type=\"hidden\" value=\"([^\"]+)\"")]

@@ -104,6 +104,12 @@ namespace FireAlarmScheduler.Data.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<DateTime?>("CompletedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("CompletedByTechnicianId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid>("JobId")
                         .HasColumnType("uniqueidentifier");
 
@@ -120,6 +126,8 @@ namespace FireAlarmScheduler.Data.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CompletedByTechnicianId");
 
                     b.HasIndex("JobId");
 
@@ -145,6 +153,10 @@ namespace FireAlarmScheduler.Data.Migrations
 
                     b.Property<TimeOnly>("EndTime")
                         .HasColumnType("time");
+
+                    b.Property<string>("FilesUrl")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -318,40 +330,6 @@ namespace FireAlarmScheduler.Data.Migrations
                     b.ToTable("Technicians");
                 });
 
-            modelBuilder.Entity("FireAlarmScheduler.Entities.UploadedFile", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("BuildingId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("OriginalFileName")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)");
-
-                    b.Property<long>("SizeBytes")
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("StoredFileName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<DateTime>("UploadDate")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("BuildingId");
-
-                    b.HasIndex("StoredFileName")
-                        .IsUnique();
-
-                    b.ToTable("UploadedFiles");
-                });
-
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>
                 {
                     b.Property<string>("Id")
@@ -495,6 +473,11 @@ namespace FireAlarmScheduler.Data.Migrations
 
             modelBuilder.Entity("FireAlarmScheduler.Entities.Building", b =>
                 {
+                    b.HasOne("FireAlarmScheduler.Entities.Technician", null)
+                        .WithMany()
+                        .HasForeignKey("CompletedByTechnicianId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("FireAlarmScheduler.Entities.Job", null)
                         .WithMany("Buildings")
                         .HasForeignKey("JobId")
@@ -539,15 +522,6 @@ namespace FireAlarmScheduler.Data.Migrations
                     b.HasOne("FireAlarmScheduler.Entities.RecurringJob", null)
                         .WithMany("Buildings")
                         .HasForeignKey("RecurringJobId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("FireAlarmScheduler.Entities.UploadedFile", b =>
-                {
-                    b.HasOne("FireAlarmScheduler.Entities.Building", null)
-                        .WithMany("UploadedFiles")
-                        .HasForeignKey("BuildingId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
@@ -601,11 +575,6 @@ namespace FireAlarmScheduler.Data.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-                });
-
-            modelBuilder.Entity("FireAlarmScheduler.Entities.Building", b =>
-                {
-                    b.Navigation("UploadedFiles");
                 });
 
             modelBuilder.Entity("FireAlarmScheduler.Entities.Job", b =>

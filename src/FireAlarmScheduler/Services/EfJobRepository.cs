@@ -1,4 +1,4 @@
-// Purpose: Stores jobs, their technician assignments, buildings, and file metadata in SQL tables via EF Core.
+// Purpose: Stores jobs, their technician assignments, and buildings in SQL tables via EF Core.
 // Each call uses its own short-lived DbContext, so results are detached snapshots like the old JSON store.
 using FireAlarmScheduler.Data;
 using FireAlarmScheduler.Entities;
@@ -66,6 +66,5 @@ public class EfJobRepository : IJobRepository
     /// <summary>Loads everything a job page needs, with buildings in the order they were added.</summary>
     private static IQueryable<Job> WithChildren(IQueryable<Job> jobs) =>
         jobs.Include(j => j.Assignments)
-            .Include(j => j.Buildings.OrderBy(b => b.SortOrder))
-            .ThenInclude(b => b.UploadedFiles);
+            .Include(j => j.Buildings.OrderBy(b => b.SortOrder));
 }

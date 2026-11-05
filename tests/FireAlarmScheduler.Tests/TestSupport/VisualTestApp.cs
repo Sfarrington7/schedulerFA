@@ -3,7 +3,6 @@
 // signs in once as a SuperAdmin and once as a technician so each test can open pages already signed in.
 using System.Net;
 using System.Net.Sockets;
-using System.Text;
 using FireAlarmScheduler.Entities;
 using FireAlarmScheduler.Services;
 using Microsoft.Extensions.DependencyInjection;
@@ -59,7 +58,8 @@ public sealed class VisualTestApp : IAsyncLifetime
         BaseUrl + Ids.Aggregate(path, (current, id) => current.Replace("{" + id.Key + "}", id.Value));
 
     /// <summary>
-    /// Four technicians; a recurring five-day job with three buildings (one with a spreadsheet); overlapping jobs that
+    /// Four technicians; a recurring five-day job with a Google Drive files link and three buildings (Building A checked
+    /// off by John); overlapping jobs that
     /// double-book John; a job during Sara's approved PTO; one pending PTO request; and a job running into December.
     /// </summary>
     private async Task SeedAsync()
@@ -75,13 +75,14 @@ public sealed class VisualTestApp : IAsyncLifetime
         var sara = await technicians.AddAsync("Sara", "Lee");
         var dave = await technicians.AddAsync("Dave", "Brown");
 
-        var plaza = await jobs.CreateAsync(ServiceHarness.ValidJob(john.Id, mike.Id) with { SaveAsRecurring = true });
+        var plaza = await jobs.CreateAsync(ServiceHarness.ValidJob(john.Id, mike.Id) with
+        {
+            SaveAsRecurring = true, FilesUrl = "https://drive.google.com/drive/folders/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456?usp=sharing"
+        });
         var buildingA = await jobs.AddBuildingAsync(plaza.Id, "Building A", "Main lobby panel");
-        await jobs.AddBuildingAsync(plaza.Id, "Building B", "Roof access via east stairwell");
+        var buildingB = await jobs.AddBuildingAsync(plaza.Id, "Building B", "Roof access via east stairwell");
         await jobs.AddBuildingAsync(plaza.Id, "Parking Garage", null);
-        var csv = Encoding.UTF8.GetBytes("Device,Location\nPull station,Lobby\nSmoke detector,Room 101\n");
-        await services.GetRequiredService<BuildingFileService>()
-            .UploadAsync(plaza.Id, buildingA!.Id, "Building A devices.csv", new MemoryStream(csv), csv.Length);
+        await jobs.SetBuildingCompleteAsync(plaza.Id, buildingA!.Id, john.Id, complete: true);
 
         await jobs.CreateAsync(ServiceHarness.ValidJob(sara.Id) with
         {
@@ -113,6 +114,7 @@ public sealed class VisualTestApp : IAsyncLifetime
 
         Ids["jobId"] = plaza.Id.ToString();
         Ids["buildingId"] = buildingA.Id.ToString();
+        Ids["buildingBId"] = buildingB!.Id.ToString();
         Ids["recurringJobId"] = plaza.RecurringJobId!.Value.ToString();
         Ids["technicianId"] = john.Id.ToString();
     }

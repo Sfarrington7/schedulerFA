@@ -44,7 +44,7 @@ public class RecurringJobsController : Controller
             CustomerName = recurringJob.CustomerName,
             SiteName = recurringJob.SiteName,
             Address = recurringJob.Address,
-            Buildings = recurringJob.Buildings.OrderBy(b => b.SortOrder).Select(b => new BuildingViewModel(b.Id, b.Name, b.Notes, [])).ToList(),
+            Buildings = recurringJob.Buildings.OrderBy(b => b.SortOrder).Select(b => new BuildingViewModel(b.Id, b.Name, b.Notes)).ToList(),
             NewBuilding = new BuildingFormModel { JobName = recurringJob.Name }
         });
     }

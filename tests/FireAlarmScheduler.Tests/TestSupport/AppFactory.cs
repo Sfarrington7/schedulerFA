@@ -1,5 +1,5 @@
-// Purpose: Hosts the real web app in memory for end-to-end tests, with a throwaway SQL Server database and uploads
-// redirected to a temporary folder and the clock fixed to Nov 3, 2026. Also creates accounts and
+// Purpose: Hosts the real web app in memory for end-to-end tests, with a throwaway SQL Server database and the clock
+// fixed to Nov 3, 2026. Also creates accounts and
 // returns HTTP clients already signed in through the real login form.
 using System.Net;
 using FireAlarmScheduler.Entities;
@@ -17,14 +17,10 @@ public sealed class AppFactory : WebApplicationFactory<Program>
 
     private readonly TempDirectory _dir = new();
 
-    public string UploadsDirectory => _dir.Combine("uploads");
-
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Development");
         builder.UseSetting("ConnectionStrings:DefaultConnection", TestDatabase.ConnectionStringFor(_dir.DatabaseName));
-        builder.UseSetting("Storage:UploadsDirectory", UploadsDirectory);
-        builder.UseSetting("Storage:MaxFileSizeBytes", "1024");
         builder.ConfigureServices(services =>
             services.AddSingleton<TimeProvider>(new FixedTimeProvider(ServiceHarness.Now)));
     }

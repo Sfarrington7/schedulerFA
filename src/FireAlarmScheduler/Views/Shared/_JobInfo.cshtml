@@ -1,4 +1,4 @@
-@* Read-only job facts shared by the team lead and technician job pages. *@
+@* Read-only job facts shared by the team lead and technician job pages, including the job files link (opens in a new tab). *@
 @model JobDetailsViewModel
 @{
     var job = Model.Summary;
@@ -24,6 +24,20 @@
     <dd class="col-sm-9">@job.TimeRangeText</dd>
     <dt class="col-sm-3">Technicians</dt>
     <dd class="col-sm-9">@job.TechnicianNamesText</dd>
+    <dt class="col-sm-3">Job files</dt>
+    <dd class="col-sm-9">
+        @if (Model.FilesUrl is not null)
+        {
+            <a class="btn btn-sm btn-primary files-link" href="@Model.FilesUrl" target="_blank" rel="noopener noreferrer">
+                Open job files<span class="visually-hidden"> (opens in a new tab)</span>
+            </a>
+            <span class="small text-body-secondary ms-1 text-break">@Model.FilesSiteName</span>
+        }
+        else
+        {
+            <span class="text-body-secondary">No files link added</span>
+        }
+    </dd>
     @if (Model.Notes is not null)
     {
         <dt class="col-sm-3">Notes</dt>

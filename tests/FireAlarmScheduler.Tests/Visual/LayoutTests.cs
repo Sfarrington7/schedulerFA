@@ -2,7 +2,8 @@
 // Every page is opened in headless Chromium and checked for: a successful load with no script errors or missing
 // files; no sideways scrolling or content running off the screen; no buttons, links or fields overlapping; no text too
 // small to read; and the right navigation for the width (sidebar on desktop, top bar and slide-out menu below 992px).
-// Each page's screenshot is saved under bin/.../layout-screenshots/<viewport>/ for a quick manual look.
+// Each page's screenshot is saved under bin/.../layout-screenshots/<viewport>/ for a quick manual look. The phone tests
+// also drive the menu, the technician picker, and the building checklist script (ticking, saving, and a failed save).
 using System.Text.Json;
 using FireAlarmScheduler.Services;
 using FireAlarmScheduler.Tests.TestSupport;
@@ -33,7 +34,6 @@ public abstract class LayoutTests(VisualTestApp app, string viewportName, int wi
         { Lead, "/Jobs/Details/{jobId}" },
         { Lead, "/Jobs/Edit/{jobId}" },
         { Lead, "/Jobs/Delete/{jobId}" },
-        { Lead, "/Jobs/{jobId}/Buildings/{buildingId}" },
         { Lead, "/Jobs/{jobId}/Buildings/{buildingId}/Edit" },
         { Lead, "/RecurringJobs" },
         { Lead, "/RecurringJobs/Details/{recurringJobId}" },
@@ -303,6 +303,64 @@ public sealed class PhoneLayoutTests(VisualTestApp app) : LayoutTests(app, "phon
         await page.Locator(".app-sidebar").WaitForAsync(new() { State = WaitForSelectorState.Hidden });
 
         Assert.False(await page.Locator(".app-sidebar").IsVisibleAsync());
+    }
+
+    /// <summary>
+    /// Runs the checklist script for real: ticking Building B saves it and moves it to Completed (in job order) without
+    /// reloading the page, the progress updates, it is still there after a reload, and unticking puts it back.
+    /// Ends as it started so the other tests see the seeded checklist.
+    /// </summary>
+    [VisualFact]
+    public async Task Checklist_TickAndUntickBuilding_MovesBetweenSectionsAndSaves()
+    {
+        await using var context = await NewContextAsync(AppRoles.Technician);
+        var page = await context.NewPageAsync();
+        var problems = new List<string>();
+        page.PageError += (_, error) => problems.Add(error);
+        await page.GotoAsync(App.Url("/TechnicianView/Job/{jobId}?technicianId={technicianId}"));
+        var todo = page.Locator("[data-list=todo] .checklist-name");
+        var done = page.Locator("[data-list=done] .checklist-name");
+        Assert.Equal(["Building B", "Parking Garage"], await todo.AllTextContentsAsync());
+        Assert.Equal(["Building A"], await done.AllTextContentsAsync());
+        await page.EvaluateAsync("window.samePage = true");
+
+        await page.GetByLabel("Building B").CheckAsync();
+        await page.WaitForFunctionAsync("document.querySelectorAll('[data-list=done] li').length === 2");
+
+        Assert.Equal(["Building A", "Building B"], await done.AllTextContentsAsync());
+        Assert.Equal(["Parking Garage"], await todo.AllTextContentsAsync());
+        Assert.Equal("2 of 3 buildings complete", await page.Locator("[data-progress-text]").TextContentAsync());
+        Assert.Equal("2", await page.Locator("[data-count=done]").TextContentAsync());
+        Assert.Contains("John Smith", await page.Locator("#building-{buildingB} [data-completed-text]".Replace("{buildingB}", App.Ids["buildingBId"])).TextContentAsync());
+        Assert.True(await page.EvaluateAsync<bool>("window.samePage === true"), "The page did not reload.");
+
+        await page.ReloadAsync();
+        Assert.Equal(["Building A", "Building B"], await done.AllTextContentsAsync());
+
+        await page.GetByLabel("Building B").UncheckAsync();
+        await page.WaitForFunctionAsync("document.querySelectorAll('[data-list=done] li').length === 1");
+        Assert.Equal(["Building B", "Parking Garage"], await todo.AllTextContentsAsync());
+        await page.ReloadAsync();
+        Assert.Equal(["Building B", "Parking Garage"], await todo.AllTextContentsAsync());
+        Assert.Empty(problems);
+    }
+
+    [VisualFact]
+    public async Task Checklist_SaveFails_UndoesTickAndShowsError()
+    {
+        await using var context = await NewContextAsync(AppRoles.Technician);
+        var page = await context.NewPageAsync();
+        await page.GotoAsync(App.Url("/TechnicianView/Job/{jobId}?technicianId={technicianId}"));
+
+        await context.SetOfflineAsync(true);
+        await page.GetByLabel("Parking Garage").ClickAsync();
+        var error = page.Locator("[data-checklist-error]");
+        await error.WaitForAsync();
+
+        Assert.Contains("Couldn't save that change", await error.TextContentAsync());
+        Assert.False(await page.GetByLabel("Parking Garage").IsCheckedAsync());
+        Assert.Equal(["Building B", "Parking Garage"], await page.Locator("[data-list=todo] .checklist-name").AllTextContentsAsync());
+        await context.SetOfflineAsync(false);
     }
 
     [VisualFact]

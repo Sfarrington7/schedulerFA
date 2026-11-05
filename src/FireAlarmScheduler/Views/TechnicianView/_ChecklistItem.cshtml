@@ -1,0 +1,27 @@
+@* One building on the technician's checklist: a checkbox that saves straight away (wwwroot/js/building-checklist.js),
+   with a Save button as a fallback when scripts are off. Disabled for someone viewing another technician's checklist. *@
+@model ChecklistItemViewModel
+@{
+    var building = Model.Building;
+}
+<li class="list-group-item checklist-item" id="building-@building.Id" data-position="@Model.Position">
+    <form asp-controller="TechnicianView" asp-action="SetBuildingComplete" asp-route-id="@Model.JobId" asp-route-buildingId="@building.Id"
+          method="post" class="checklist-form">
+        <label class="checklist-label">
+            <input type="checkbox" class="form-check-input checklist-check" name="complete" value="true"
+                   checked="@building.IsComplete" disabled="@(!Model.CanCheckOff)" />
+            <span class="checklist-body">
+                <span class="checklist-name">@building.Name</span>
+                @if (building.Notes is not null)
+                {
+                    <span class="checklist-notes notes">@building.Notes</span>
+                }
+                <span class="checklist-done" data-completed-text>@building.CompletedText</span>
+            </span>
+        </label>
+        @if (Model.CanCheckOff)
+        {
+            <noscript><button type="submit" class="btn btn-sm btn-outline-primary checklist-save">Save</button></noscript>
+        }
+    </form>
+</li>

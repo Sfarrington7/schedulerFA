@@ -1,5 +1,5 @@
 // Purpose: Stored record for a scheduled fire alarm testing job (the Jobs table).
-// Holds its schedule, assigned technicians, and the buildings (with their files) it covers.
+// Holds its schedule, assigned technicians, the buildings it covers, and a link to the job's files.
 namespace FireAlarmScheduler.Entities;
 
 public class Job
@@ -20,6 +20,9 @@ public class Job
 
     public JobStatus Status { get; set; } = JobStatus.Scheduled;
     public string? Notes { get; set; }
+
+    /// <summary>A web link to the job's files (for example a shared Google Drive folder), or null.</summary>
+    public string? FilesUrl { get; set; }
 
     /// <summary>The recurring job this job belongs to, or null for a one-off job.</summary>
     public Guid? RecurringJobId { get; set; }

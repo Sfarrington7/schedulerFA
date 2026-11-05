@@ -1,6 +1,6 @@
 // Purpose: Tests SQL persistence through the EF Core repositories on a throwaway SQL Server database built from
 // the real migrations: full job graphs survive restarts, rows keep their order, failed changes save nothing,
-// and database cascades clean up assignments and account links.
+// and database cascades clean up assignments, account links, and who checked a building off.
 using FireAlarmScheduler.Entities;
 using FireAlarmScheduler.Services;
 using FireAlarmScheduler.Tests.TestSupport;
@@ -24,9 +24,12 @@ public class EfRepositoryTests : IDisposable
     public async Task JobGraph_SavedAndReloadedAfterRestart_KeepsEveryField()
     {
         var tech = await _harness.TechnicianService.AddAsync("John", "Smith");
-        var job = await _harness.JobService.CreateAsync(ServiceHarness.ValidJob(tech.Id) with { Status = JobStatus.InProgress });
+        var job = await _harness.JobService.CreateAsync(ServiceHarness.ValidJob(tech.Id) with
+        {
+            Status = JobStatus.InProgress, FilesUrl = "https://drive.google.com/drive/folders/abc"
+        });
         var building = (await _harness.JobService.AddBuildingAsync(job.Id, "Building A", "Roof"))!;
-        var file = (await _harness.FileService.UploadAsync(job.Id, building.Id, "devices.csv", new MemoryStream([1, 2]), 2))!;
+        await _harness.JobService.SetBuildingCompleteAsync(job.Id, building.Id, tech.Id, complete: true);
 
         var reloaded = (await new ServiceHarness(_dir.Path).Jobs.GetByIdAsync(job.Id))!;
 
@@ -34,11 +37,11 @@ public class EfRepositoryTests : IDisposable
         Assert.Equal(new DateOnly(2026, 11, 2), reloaded.StartDate);
         Assert.Equal(new TimeOnly(16, 0), reloaded.EndTime);
         Assert.Equal([tech.Id], reloaded.AssignedTechnicianIds);
+        Assert.Equal("https://drive.google.com/drive/folders/abc", reloaded.FilesUrl);
         var storedBuilding = Assert.Single(reloaded.Buildings);
         Assert.Equal("Roof", storedBuilding.Notes);
-        var storedFile = Assert.Single(storedBuilding.UploadedFiles);
-        Assert.Equal(file.StoredFileName, storedFile.StoredFileName);
-        Assert.Equal(ServiceHarness.Now.UtcDateTime, storedFile.UploadDate);
+        Assert.Equal(ServiceHarness.Now.UtcDateTime, storedBuilding.CompletedAtUtc);
+        Assert.Equal(tech.Id, storedBuilding.CompletedByTechnicianId);
     }
 
     [Fact]
@@ -81,20 +84,34 @@ public class EfRepositoryTests : IDisposable
     }
 
     [Fact]
-    public async Task DeleteJob_CascadesToBuildingsFilesAndAssignments()
+    public async Task DeleteJob_CascadesToBuildingsAndAssignments()
     {
         var tech = await _harness.TechnicianService.AddAsync("John", "Smith");
         var job = await _harness.JobService.CreateAsync(ServiceHarness.ValidJob(tech.Id));
         var building = (await _harness.JobService.AddBuildingAsync(job.Id, "Building A", null))!;
-        await _harness.FileService.UploadAsync(job.Id, building.Id, "a.csv", new MemoryStream([1]), 1);
+        await _harness.JobService.SetBuildingCompleteAsync(job.Id, building.Id, tech.Id, complete: true);
 
         Assert.True(await _harness.JobService.DeleteAsync(job.Id));
 
         await using var db = await _harness.ContextFactory.CreateDbContextAsync();
         Assert.Empty(await db.Buildings.ToListAsync());
-        Assert.Empty(await db.UploadedFiles.ToListAsync());
         Assert.Empty(await db.JobAssignments.ToListAsync());
         Assert.NotNull(await db.Technicians.FindAsync(tech.Id));
+    }
+
+    [Fact]
+    public async Task DeleteTechnician_BuildingTheyCompletedStaysCompleteWithoutTheirName()
+    {
+        var john = await _harness.TechnicianService.AddAsync("John", "Smith");
+        var job = await _harness.JobService.CreateAsync(ServiceHarness.ValidJob(john.Id));
+        var building = (await _harness.JobService.AddBuildingAsync(job.Id, "Building A", null))!;
+        await _harness.JobService.SetBuildingCompleteAsync(job.Id, building.Id, john.Id, complete: true);
+
+        await _harness.TechnicianService.DeleteAsync(john.Id);
+
+        var stored = Assert.Single((await new ServiceHarness(_dir.Path).Jobs.GetByIdAsync(job.Id))!.Buildings);
+        Assert.True(stored.IsComplete);
+        Assert.Null(stored.CompletedByTechnicianId);
     }
 
     [Fact]

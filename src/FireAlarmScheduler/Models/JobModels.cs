@@ -1,5 +1,5 @@
-// Purpose: View and form models for jobs (including the recurring-job choice and the technician picker with each
-// technician's conflicts), their buildings, uploaded files, and the Recurring jobs page.
+// Purpose: View and form models for jobs (including the recurring-job choice, the technician picker with each
+// technician's conflicts, and the job files link), their building checklists, and the Recurring jobs page.
 using System.ComponentModel.DataAnnotations;
 using FireAlarmScheduler.Entities;
 using FireAlarmScheduler.Services;
@@ -39,6 +39,10 @@ public class JobFormModel
     [StringLength(4000), Display(Name = "Notes / instructions")]
     public string? Notes { get; set; }
 
+    /// <summary>Link to the job's files, such as a shared Google Drive folder; checked by the service.</summary>
+    [StringLength(JobFilesLink.MaxLength), Display(Name = "Job files link (optional)")]
+    public string? FilesUrl { get; set; }
+
     [Display(Name = "Assigned technicians")]
     public List<Guid> AssignedTechnicianIds { get; set; } = [];
 
@@ -72,7 +76,8 @@ public class JobFormModel
     public JobInput ToInput() => new(Name, CustomerName, SiteName, Address, StartDate, EndDate,
         StartTime, EndTime, Status, Notes, AssignedTechnicianIds,
         IsNew ? RecurringJobId : null, SaveAsRecurring && (!IsNew || RecurringJobId is null),
-        IsNew ? Buildings.Select(b => new BuildingInput(b.Name, b.Notes, b.RecurringBuildingId)).ToList() : null);
+        IsNew ? Buildings.Select(b => new BuildingInput(b.Name, b.Notes, b.RecurringBuildingId)).ToList() : null,
+        FilesUrl);
 
     public static JobFormModel FromEntity(Job job) => new()
     {
@@ -87,6 +92,7 @@ public class JobFormModel
         EndTime = job.EndTime,
         Status = job.Status,
         Notes = job.Notes,
+        FilesUrl = job.FilesUrl,
         AssignedTechnicianIds = [.. job.AssignedTechnicianIds]
     };
 }
@@ -204,39 +210,53 @@ public class JobDetailsViewModel
 {
     public JobSummaryViewModel Summary { get; init; } = new();
     public string? Notes { get; init; }
+
+    /// <summary>The job files link (always http or https), or null if none was added.</summary>
+    public string? FilesUrl { get; init; }
+
     public List<BuildingViewModel> Buildings { get; init; } = [];
 
     /// <summary>Empty form for adding a building from the job page.</summary>
     public BuildingFormModel NewBuilding { get; init; } = new();
 
+    /// <summary>The website the files link opens, e.g. "drive.google.com", so people can see where it goes.</summary>
+    public string? FilesSiteName => FilesUrl is not null && Uri.TryCreate(FilesUrl, UriKind.Absolute, out var uri)
+        ? uri.Host.StartsWith("www.", StringComparison.OrdinalIgnoreCase) ? uri.Host[4..] : uri.Host
+        : null;
+
+    public int CompletedBuildingCount => Buildings.Count(b => b.IsComplete);
+
+    public int ProgressPercent => Buildings.Count == 0 ? 0 : CompletedBuildingCount * 100 / Buildings.Count;
+
+    public string ProgressText => $"{CompletedBuildingCount} of {Buildings.Count} building{(Buildings.Count == 1 ? "" : "s")} complete";
+
     public static JobDetailsViewModel FromEntity(Job job, IReadOnlyDictionary<Guid, Technician> technicians) => new()
     {
         Summary = JobSummaryViewModel.FromEntity(job, technicians),
         Notes = job.Notes,
-        Buildings = job.Buildings.Select(BuildingViewModel.FromEntity).ToList(),
+        FilesUrl = job.FilesUrl,
+        Buildings = job.Buildings.Select(b => BuildingViewModel.FromEntity(b, technicians)).ToList(),
         NewBuilding = new BuildingFormModel { JobId = job.Id, JobName = job.Name }
     };
 }
 
-public record BuildingViewModel(Guid Id, string Name, string? Notes, List<FileViewModel> Files)
+/// <summary>A building on a job's checklist (or on a recurring job's list, where it is never complete).</summary>
+public record BuildingViewModel(Guid Id, string Name, string? Notes, DateTime? CompletedAtUtc = null, string? CompletedBy = null)
 {
-    public static BuildingViewModel FromEntity(Building building) => new(
+    public bool IsComplete => CompletedAtUtc is not null;
+
+    /// <summary>When and by whom the building was checked off, e.g. "Thu, Nov 5 · John Smith"; empty while to do.</summary>
+    public string CompletedText => CompletedAtUtc is not { } completed
+        ? ""
+        : $"{DateTime.SpecifyKind(completed, DateTimeKind.Utc).ToLocalTime():ddd, MMM d}" + (CompletedBy is null ? "" : $" · {CompletedBy}");
+
+    /// <summary>Maps a building, looking up who completed it; a deleted technician's name is simply left off.</summary>
+    public static BuildingViewModel FromEntity(Building building, IReadOnlyDictionary<Guid, Technician> technicians) => new(
         building.Id,
         building.Name,
         building.Notes,
-        building.UploadedFiles.OrderBy(f => f.OriginalFileName, StringComparer.OrdinalIgnoreCase).Select(FileViewModel.FromEntity).ToList());
-}
-
-public record FileViewModel(Guid Id, string OriginalFileName, long SizeBytes, DateTime UploadDateUtc)
-{
-    public string SizeText => SizeBytes switch
-    {
-        < 1024 => $"{SizeBytes} B",
-        < 1024 * 1024 => $"{SizeBytes / 1024.0:0.#} KB",
-        _ => $"{SizeBytes / (1024.0 * 1024):0.#} MB"
-    };
-
-    public static FileViewModel FromEntity(UploadedFile file) => new(file.Id, file.OriginalFileName, file.SizeBytes, file.UploadDate);
+        building.CompletedAtUtc,
+        building.CompletedByTechnicianId is { } id && technicians.TryGetValue(id, out var technician) ? technician.FullName : null);
 }
 
 public class BuildingFormModel
@@ -250,14 +270,4 @@ public class BuildingFormModel
 
     [StringLength(2000), Display(Name = "Building notes (optional)")]
     public string? Notes { get; set; }
-}
-
-/// <summary>The team lead's page for one building: its details and file upload/management.</summary>
-public class BuildingDetailsViewModel
-{
-    public Guid JobId { get; init; }
-    public string JobName { get; init; } = "";
-    public BuildingViewModel Building { get; init; } = new(Guid.Empty, "", null, []);
-    public string AllowedExtensionsText { get; init; } = "";
-    public long MaxFileSizeMegabytes { get; init; }
 }

@@ -1,5 +1,5 @@
-// Purpose: Tests job scheduling: create/edit/delete, validation, technician assignment,
-// building management, and daily/weekly date-range queries.
+// Purpose: Tests job scheduling: create/edit/delete, validation, the job files link, technician assignment,
+// building management, the technicians' building checklist, and daily/weekly date-range queries.
 using FireAlarmScheduler.Entities;
 using FireAlarmScheduler.Services;
 using FireAlarmScheduler.Tests.TestSupport;
@@ -93,17 +93,135 @@ public class JobServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task DeleteAsync_JobWithFiles_RemovesJobAndStoredFiles()
+    public async Task DeleteAsync_JobWithBuildings_RemovesJob()
     {
         var job = await Jobs.CreateAsync(ServiceHarness.ValidJob());
-        var building = (await Jobs.AddBuildingAsync(job.Id, "Building A", null))!;
-        var file = (await _harness.FileService.UploadAsync(job.Id, building.Id, "devices.csv", new MemoryStream([1, 2, 3]), 3))!;
+        await Jobs.AddBuildingAsync(job.Id, "Building A", null);
 
-        var deleted = await Jobs.DeleteAsync(job.Id);
+        Assert.True(await Jobs.DeleteAsync(job.Id));
 
-        Assert.True(deleted);
         Assert.Null(await Jobs.GetAsync(job.Id));
-        Assert.False(File.Exists(Path.Combine(_harness.UploadsDirectory, file.StoredFileName)));
+        Assert.False(await Jobs.DeleteAsync(job.Id));
+    }
+
+    [Fact]
+    public async Task CreateAsync_FilesLink_SavedTrimmed()
+    {
+        var job = await Jobs.CreateAsync(ServiceHarness.ValidJob() with { FilesUrl = "  https://drive.google.com/drive/folders/abc123?usp=sharing " });
+
+        Assert.Equal("https://drive.google.com/drive/folders/abc123?usp=sharing", (await Jobs.GetAsync(job.Id))!.FilesUrl);
+    }
+
+    [Fact]
+    public async Task CreateAsync_UnsafeFilesLink_ReportsErrorAndSavesNothing()
+    {
+        var ex = await Assert.ThrowsAsync<ValidationFailedException>(() =>
+            Jobs.CreateAsync(ServiceHarness.ValidJob() with { Name = "", FilesUrl = "javascript:alert(1)" }));
+
+        Assert.Equal(["FilesUrl", "Name"], ex.Errors.Keys.Order());
+        Assert.Empty(await Jobs.GetAllAsync());
+    }
+
+    [Fact]
+    public async Task UpdateAsync_ChangeThenClearFilesLink_StoresEachValue()
+    {
+        var job = await Jobs.CreateAsync(ServiceHarness.ValidJob() with { FilesUrl = "https://drive.google.com/drive/folders/old" });
+
+        await Jobs.UpdateAsync(job.Id, ServiceHarness.ValidJob() with { FilesUrl = "https://contoso.sharepoint.com/sites/jobs/new" });
+        Assert.Equal("https://contoso.sharepoint.com/sites/jobs/new", (await Jobs.GetAsync(job.Id))!.FilesUrl);
+
+        await Jobs.UpdateAsync(job.Id, ServiceHarness.ValidJob() with { FilesUrl = " " });
+        Assert.Null((await Jobs.GetAsync(job.Id))!.FilesUrl);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_InvalidFilesLink_KeepsOldLink()
+    {
+        var job = await Jobs.CreateAsync(ServiceHarness.ValidJob() with { FilesUrl = "https://drive.google.com/drive/folders/old" });
+
+        var ex = await Assert.ThrowsAsync<ValidationFailedException>(() =>
+            Jobs.UpdateAsync(job.Id, ServiceHarness.ValidJob() with { FilesUrl = "ftp://files.example.com/job" }));
+
+        Assert.Equal(JobFilesLink.InvalidMessage, ex.Errors["FilesUrl"]);
+        Assert.Equal("https://drive.google.com/drive/folders/old", (await Jobs.GetAsync(job.Id))!.FilesUrl);
+    }
+
+    [Fact]
+    public async Task SetBuildingCompleteAsync_AssignedTechnician_RecordsWhoAndWhen()
+    {
+        var john = await _harness.TechnicianService.AddAsync("John", "Smith");
+        var job = await Jobs.CreateAsync(ServiceHarness.ValidJob(john.Id));
+        var a = (await Jobs.AddBuildingAsync(job.Id, "Building A", null))!;
+        var b = (await Jobs.AddBuildingAsync(job.Id, "Building B", null))!;
+
+        var result = await Jobs.SetBuildingCompleteAsync(job.Id, a.Id, john.Id, complete: true);
+
+        Assert.True(result!.IsComplete);
+        var buildings = (await new ServiceHarness(_dir.Path).JobService.GetAsync(job.Id))!.Buildings;
+        Assert.Equal(ServiceHarness.Now.UtcDateTime, buildings.Single(x => x.Id == a.Id).CompletedAtUtc);
+        Assert.Equal(john.Id, buildings.Single(x => x.Id == a.Id).CompletedByTechnicianId);
+        Assert.False(buildings.Single(x => x.Id == b.Id).IsComplete);
+    }
+
+    [Fact]
+    public async Task SetBuildingCompleteAsync_Unticked_ClearsCompletion()
+    {
+        var john = await _harness.TechnicianService.AddAsync("John", "Smith");
+        var job = await Jobs.CreateAsync(ServiceHarness.ValidJob(john.Id));
+        var a = (await Jobs.AddBuildingAsync(job.Id, "Building A", null))!;
+        await Jobs.SetBuildingCompleteAsync(job.Id, a.Id, john.Id, complete: true);
+
+        await Jobs.SetBuildingCompleteAsync(job.Id, a.Id, john.Id, complete: false);
+
+        var building = Assert.Single((await Jobs.GetAsync(job.Id))!.Buildings);
+        Assert.Null(building.CompletedAtUtc);
+        Assert.Null(building.CompletedByTechnicianId);
+    }
+
+    [Fact]
+    public async Task SetBuildingCompleteAsync_AlreadyTickedBySomeoneElse_KeepsFirstTechnician()
+    {
+        var john = await _harness.TechnicianService.AddAsync("John", "Smith");
+        var mike = await _harness.TechnicianService.AddAsync("Mike", "Johnson");
+        var job = await Jobs.CreateAsync(ServiceHarness.ValidJob(john.Id, mike.Id));
+        var a = (await Jobs.AddBuildingAsync(job.Id, "Building A", null))!;
+        await Jobs.SetBuildingCompleteAsync(job.Id, a.Id, john.Id, complete: true);
+
+        var result = await Jobs.SetBuildingCompleteAsync(job.Id, a.Id, mike.Id, complete: true);
+
+        Assert.Equal(john.Id, result!.CompletedByTechnicianId);
+        Assert.Equal(john.Id, Assert.Single((await Jobs.GetAsync(job.Id))!.Buildings).CompletedByTechnicianId);
+    }
+
+    [Fact]
+    public async Task SetBuildingCompleteAsync_TechnicianNotOnJob_ReturnsNullAndChangesNothing()
+    {
+        var john = await _harness.TechnicianService.AddAsync("John", "Smith");
+        var sara = await _harness.TechnicianService.AddAsync("Sara", "Lee");
+        var job = await Jobs.CreateAsync(ServiceHarness.ValidJob(john.Id));
+        var a = (await Jobs.AddBuildingAsync(job.Id, "Building A", null))!;
+
+        Assert.Null(await Jobs.SetBuildingCompleteAsync(job.Id, a.Id, sara.Id, complete: true));
+        Assert.Null(await Jobs.SetBuildingCompleteAsync(job.Id, Guid.NewGuid(), john.Id, complete: true));
+        Assert.Null(await Jobs.SetBuildingCompleteAsync(Guid.NewGuid(), a.Id, john.Id, complete: true));
+
+        Assert.False(Assert.Single((await Jobs.GetAsync(job.Id))!.Buildings).IsComplete);
+    }
+
+    [Fact]
+    public async Task UpdateBuildingAsync_CompletedBuilding_StaysComplete()
+    {
+        var john = await _harness.TechnicianService.AddAsync("John", "Smith");
+        var job = await Jobs.CreateAsync(ServiceHarness.ValidJob(john.Id));
+        var a = (await Jobs.AddBuildingAsync(job.Id, "Bldg A", null))!;
+        await Jobs.SetBuildingCompleteAsync(job.Id, a.Id, john.Id, complete: true);
+
+        await Jobs.UpdateBuildingAsync(job.Id, a.Id, "Building A", "Roof access");
+        await Jobs.UpdateAsync(job.Id, ServiceHarness.ValidJob(john.Id) with { Status = JobStatus.InProgress });
+
+        var building = Assert.Single((await Jobs.GetAsync(job.Id))!.Buildings);
+        Assert.Equal("Building A", building.Name);
+        Assert.Equal(john.Id, building.CompletedByTechnicianId);
     }
 
     [Fact]
@@ -152,20 +270,17 @@ public class JobServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task DeleteBuildingAsync_RemovesBuildingAndItsFilesOnly()
+    public async Task DeleteBuildingAsync_RemovesOnlyThatBuilding()
     {
         var job = await Jobs.CreateAsync(ServiceHarness.ValidJob());
         var a = (await Jobs.AddBuildingAsync(job.Id, "Building A", null))!;
-        var b = (await Jobs.AddBuildingAsync(job.Id, "Building B", null))!;
-        var fileA = (await _harness.FileService.UploadAsync(job.Id, a.Id, "a.csv", new MemoryStream([1]), 1))!;
-        var fileB = (await _harness.FileService.UploadAsync(job.Id, b.Id, "b.csv", new MemoryStream([2]), 1))!;
+        await Jobs.AddBuildingAsync(job.Id, "Building B", null);
 
         Assert.True(await Jobs.DeleteBuildingAsync(job.Id, a.Id));
 
         Assert.Equal("Building B", Assert.Single((await Jobs.GetAsync(job.Id))!.Buildings).Name);
-        Assert.False(File.Exists(Path.Combine(_harness.UploadsDirectory, fileA.StoredFileName)));
-        Assert.True(File.Exists(Path.Combine(_harness.UploadsDirectory, fileB.StoredFileName)));
         Assert.False(await Jobs.DeleteBuildingAsync(job.Id, a.Id));
+        Assert.False(await Jobs.DeleteBuildingAsync(Guid.NewGuid(), a.Id));
     }
 
     [Theory]

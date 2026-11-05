@@ -94,7 +94,7 @@ public class JobsController : Controller
             {
                 var job = await _jobService.CreateAsync(form.ToInput());
                 TempData["Message"] = job.Buildings.Count > 0
-                    ? $"Job created with {job.Buildings.Count} building(s). Upload each building's spreadsheets below."
+                    ? $"Job created with {job.Buildings.Count} building(s)."
                     : "Job created. Add its buildings below.";
                 return RedirectToAction(nameof(Details), new { id = job.Id });
             }

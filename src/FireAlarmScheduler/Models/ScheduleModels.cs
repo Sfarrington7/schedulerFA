@@ -322,4 +322,19 @@ public class TechnicianJobViewModel
 {
     public TechnicianOption Technician { get; init; } = new(Guid.Empty, "");
     public JobDetailsViewModel Job { get; init; } = new();
+
+    /// <summary>True when the signed-in user is this technician, so they can check buildings off.</summary>
+    public bool CanCheckOffBuildings { get; init; }
+
+    /// <summary>The checklist items in each section, keeping each building's place in the job's order.</summary>
+    public List<ChecklistItemViewModel> ItemsWhere(bool complete) => Job.Buildings
+        .Select((building, position) => new ChecklistItemViewModel(Job.Summary.Id, position, building, CanCheckOffBuildings))
+        .Where(item => item.Building.IsComplete == complete)
+        .ToList();
 }
+
+/// <summary>
+/// One building on the technician's checklist. <paramref name="Position"/> is its place in the job's building order,
+/// which the checklist script uses to slot it back in the right place when it moves between sections.
+/// </summary>
+public record ChecklistItemViewModel(Guid JobId, int Position, BuildingViewModel Building, bool CanCheckOff);

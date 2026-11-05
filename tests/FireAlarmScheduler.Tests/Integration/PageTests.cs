@@ -37,8 +37,7 @@ public class PageTests : IDisposable
     [Theory]
     [InlineData("/Jobs/Details/00000000-0000-0000-0000-000000000001")]
     [InlineData("/Technicians/Edit/00000000-0000-0000-0000-000000000001")]
-    [InlineData("/Jobs/00000000-0000-0000-0000-000000000001/Buildings/00000000-0000-0000-0000-000000000002")]
-    [InlineData("/Jobs/00000000-0000-0000-0000-000000000001/Buildings/00000000-0000-0000-0000-000000000002/Files/00000000-0000-0000-0000-000000000003")]
+    [InlineData("/Jobs/00000000-0000-0000-0000-000000000001/Buildings/00000000-0000-0000-0000-000000000002/Edit")]
     [InlineData("/TechnicianView/Job/00000000-0000-0000-0000-000000000001?technicianId=00000000-0000-0000-0000-000000000002")]
     public async Task Get_UnknownIds_ReturnsNotFound(string url)
     {

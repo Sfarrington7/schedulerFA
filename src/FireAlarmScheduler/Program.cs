@@ -1,18 +1,16 @@
 // Purpose: Application startup. Registers MVC, the EF Core (SQL Server) database, ASP.NET Core Identity with
-// role-based authorization, local file storage, and the scheduling services, then configures the pipeline.
+// role-based authorization, and the scheduling services, then configures the pipeline.
 using FireAlarmScheduler.Data;
 using FireAlarmScheduler.Entities;
 using FireAlarmScheduler.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllersWithViews();
 
-builder.Services.Configure<StorageOptions>(builder.Configuration.GetSection(StorageOptions.SectionName));
 builder.Services.AddSingleton(TimeProvider.System);
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
@@ -52,11 +50,6 @@ builder.Services.AddAuthorizationBuilder()
     .AddPolicy(AppPolicies.ManagePto, policy => policy.RequireRole(AppPolicies.ManagePtoRoles))
     .AddPolicy(AppPolicies.RequestPto, policy => policy.RequireRole(AppRoles.Technician));
 
-// Storage paths come from configuration and resolve against the content root, never wwwroot.
-builder.Services.AddSingleton<IFileStorage>(services =>
-    new LocalFileStorage(Path.Combine(builder.Environment.ContentRootPath,
-        services.GetRequiredService<IOptions<StorageOptions>>().Value.UploadsDirectory)));
-
 builder.Services.AddSingleton<ITechnicianRepository, EfTechnicianRepository>();
 builder.Services.AddSingleton<IJobRepository, EfJobRepository>();
 builder.Services.AddSingleton<IPtoRepository, EfPtoRepository>();
@@ -64,7 +57,6 @@ builder.Services.AddSingleton<IRecurringJobRepository, EfRecurringJobRepository>
 builder.Services.AddScoped<TechnicianService>();
 builder.Services.AddScoped<RecurringJobService>();
 builder.Services.AddScoped<JobService>();
-builder.Services.AddScoped<BuildingFileService>();
 builder.Services.AddScoped<UserAdministrationService>();
 builder.Services.AddScoped<PtoService>();
 builder.Services.AddScoped<ScheduleConflictService>();

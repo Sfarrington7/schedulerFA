@@ -1,6 +1,7 @@
 // Purpose: Runs the README's primary workflow end to end over HTTP: a signed-in team lead adds technicians,
-// creates and schedules a job, assigns technicians, adds buildings, and uploads spreadsheets; then a
-// technician account signs in and downloads one. Also covers upload rejection and edit/delete flows.
+// creates and schedules a job with a link to its files, assigns technicians, and adds buildings; then a technician
+// account signs in, opens the job, and checks buildings off while the team lead watches progress. Also covers
+// validation, edit, and delete flows.
 using System.Net;
 using FireAlarmScheduler.Entities;
 using FireAlarmScheduler.Services;
@@ -46,7 +47,8 @@ public class WorkflowTests : IDisposable
             ("StartTime", "08:00"),
             ("EndTime", "16:30"),
             ("Status", "Scheduled"),
-            ("Notes", "Check in at the security desk.")
+            ("Notes", "Check in at the security desk."),
+            ("FilesUrl", "https://drive.google.com/drive/folders/plaza-2026")
         };
         fields.AddRange(technicianIds.Select(id => ("AssignedTechnicianIds", id.ToString())));
 
@@ -63,9 +65,9 @@ public class WorkflowTests : IDisposable
     }
 
     [Fact]
-    public async Task PrimaryWorkflow_TeamLeadSchedulesJob_TechnicianDownloadsBuildingSpreadsheet()
+    public async Task PrimaryWorkflow_TeamLeadSchedulesJob_TechnicianOpensFilesAndChecksOffBuildings()
     {
-        // Steps 1–4: three technicians; a Nov 2–6 job assigned to two of them.
+        // Steps 1–4: three technicians; a Nov 2–6 job assigned to two of them, with a link to its files.
         await AddTechnicianAsync("John", "Smith");
         await AddTechnicianAsync("Mike", "Johnson");
         await AddTechnicianAsync("Sara", "Lee");
@@ -76,6 +78,7 @@ public class WorkflowTests : IDisposable
         var job = await CreateJobAsync(john.Id, mike.Id);
         Assert.Equal(new DateOnly(2026, 11, 2), job.StartDate);
         Assert.Equal(new TimeOnly(16, 30), job.EndTime);
+        Assert.Equal("https://drive.google.com/drive/folders/plaza-2026", job.FilesUrl);
 
         // Step 5: three buildings.
         foreach (var name in new[] { "Building A", "Building B", "Parking Garage" })
@@ -85,22 +88,9 @@ public class WorkflowTests : IDisposable
 
         var buildings = Assert.Single(await JobsAsync()).Buildings;
         Assert.Equal(["Building A", "Building B", "Parking Garage"], buildings.Select(b => b.Name));
+        var buildingA = buildings[0];
 
-        // Step 6: a separate spreadsheet per building.
-        var buildingABytes = "Device,Location\nSmoke detector,Lobby\n"u8.ToArray();
-        foreach (var building in buildings)
-        {
-            var bytes = building.Name == "Building A" ? buildingABytes : [1, 2, 3];
-            var page = $"/Jobs/{job.Id}/Buildings/{building.Id}";
-            var upload = await FormPoster.PostFilesAsync(_client, page, $"{page}/Files", ($"{building.Name} devices.csv", bytes));
-            upload.EnsureSuccessStatusCode();
-            Assert.Contains("Uploaded 1 file.", await upload.Content.ReadAsStringAsync());
-        }
-
-        var buildingA = (await JobsAsync())[0].Buildings.Single(b => b.Name == "Building A");
-        var fileA = Assert.Single(buildingA.UploadedFiles);
-
-        // Steps 7–8: the team lead can view John's weekly schedule (job, address, buildings); Sara's lacks the job.
+        // Steps 6–7: the team lead can view John's weekly schedule (job, address, buildings); Sara's lacks the job.
         var schedule = await _client.GetStringAsync($"/TechnicianView?technicianId={john.Id}&range=Week&date=2026-11-03");
         Assert.Contains("Central Plaza Annual Fire Alarm Inspection", schedule);
         Assert.Contains("100 Main Street", schedule);
@@ -108,56 +98,39 @@ public class WorkflowTests : IDisposable
         var saraSchedule = await _client.GetStringAsync($"/TechnicianView?technicianId={sara.Id}&range=Week&date=2026-11-03");
         Assert.DoesNotContain("Central Plaza Annual Fire Alarm Inspection", saraSchedule);
 
-        var jobPage = await _client.GetStringAsync($"/TechnicianView/Job/{job.Id}?technicianId={john.Id}");
-        Assert.Contains("Building A devices.csv", jobPage);
-        Assert.Contains($"/Jobs/{job.Id}/Buildings/{buildingA.Id}/Files/{fileA.Id}", jobPage);
-        Assert.Contains("Check in at the security desk.", jobPage);
-
-        // Step 9: John signs in with his own technician account and sees his schedule without choosing a name.
+        // Step 8: John signs in with his own technician account and sees his schedule without choosing a name.
         await _factory.CreateUserAsync("john@example.test", AppRoles.Technician, john.Id);
         var johnClient = await _factory.SignInAsync("john@example.test");
         var johnSchedule = await johnClient.GetStringAsync("/TechnicianView?range=Week&date=2026-11-03");
         Assert.Contains("My Schedule", johnSchedule);
         Assert.Contains("Central Plaza Annual Fire Alarm Inspection", johnSchedule);
         Assert.DoesNotContain("Sara Lee", johnSchedule);
-        Assert.Contains("Building A devices.csv", await johnClient.GetStringAsync($"/TechnicianView/Job/{job.Id}?technicianId={john.Id}"));
 
-        // Step 10: John downloads Building A's spreadsheet, byte for byte, with its original name.
-        var download = await johnClient.GetAsync($"/Jobs/{job.Id}/Buildings/{buildingA.Id}/Files/{fileA.Id}");
-        download.EnsureSuccessStatusCode();
-        Assert.Equal(buildingABytes, await download.Content.ReadAsByteArrayAsync());
-        Assert.Equal("text/csv", download.Content.Headers.ContentType?.MediaType);
-        Assert.Equal("Building A devices.csv", download.Content.Headers.ContentDisposition?.FileNameStar);
+        // Step 9: his job page links to the files and lists every building to do.
+        var jobPageUrl = $"/TechnicianView/Job/{job.Id}?technicianId={john.Id}";
+        var jobPage = await johnClient.GetStringAsync(jobPageUrl);
+        Assert.Contains("href=\"https://drive.google.com/drive/folders/plaza-2026\"", jobPage);
+        Assert.Contains("Check in at the security desk.", jobPage);
+        Assert.Contains("0 of 3 buildings complete", jobPage);
+
+        // Step 10: John checks Building A off; the team lead sees the progress and who did it.
+        var tick = await FormPoster.PostFormAsync(johnClient, jobPageUrl,
+            $"/TechnicianView/SetBuildingComplete/{job.Id}?buildingId={buildingA.Id}", ("complete", "true"));
+        tick.EnsureSuccessStatusCode();
+        Assert.Contains("1 of 3 buildings complete", await tick.Content.ReadAsStringAsync());
+        var leadJobPage = WebUtility.HtmlDecode(await _client.GetStringAsync($"/Jobs/Details/{job.Id}"));
+        Assert.Contains("1 of 3 buildings complete", leadJobPage);
+        Assert.Contains("Tue, Nov 3 · John Smith", leadJobPage);
 
         // An unassigned technician cannot open the job page through the technician view.
         var saraJob = await _client.GetAsync($"/TechnicianView/Job/{job.Id}?technicianId={sara.Id}");
         Assert.Equal(HttpStatusCode.NotFound, saraJob.StatusCode);
 
-        // Sara's own account can't see or download John's job, even with John's id in the URL.
+        // Sara's own account can't see John's job, even with John's id in the URL.
         await _factory.CreateUserAsync("sara@example.test", AppRoles.Technician, sara.Id);
         var saraClient = await _factory.SignInAsync("sara@example.test");
         Assert.Equal(HttpStatusCode.NotFound, (await saraClient.GetAsync($"/TechnicianView/Job/{job.Id}?technicianId={john.Id}")).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await saraClient.GetAsync($"/Jobs/{job.Id}/Buildings/{buildingA.Id}/Files/{fileA.Id}")).StatusCode);
         Assert.DoesNotContain("Central Plaza", await saraClient.GetStringAsync($"/TechnicianView?technicianId={john.Id}&date=2026-11-03"));
-    }
-
-    [Fact]
-    public async Task Upload_DisallowedAndValidFilesTogether_StoresOnlyValidAndReportsRejection()
-    {
-        var job = await CreateJobAsync();
-        await AddBuildingAsync(job.Id, "Building A");
-        var building = (await JobsAsync())[0].Buildings[0];
-        var page = $"/Jobs/{job.Id}/Buildings/{building.Id}";
-
-        var response = await FormPoster.PostFilesAsync(_client, page, $"{page}/Files",
-            ("virus.exe", [1]), ("too-big.xlsx", new byte[2048]), ("devices.xlsx", [1, 2]));
-
-        var html = await response.Content.ReadAsStringAsync();
-        Assert.Contains("Uploaded 1 file.", html);
-        Assert.Contains("&quot;virus.exe&quot; is not allowed", html);
-        Assert.Contains("&quot;too-big.xlsx&quot; is larger than", html);
-        Assert.Equal("devices.xlsx", Assert.Single((await JobsAsync())[0].Buildings[0].UploadedFiles).OriginalFileName);
-        Assert.Single(Directory.EnumerateFiles(_factory.UploadsDirectory));
     }
 
     [Fact]
@@ -192,22 +165,37 @@ public class WorkflowTests : IDisposable
     }
 
     [Fact]
-    public async Task DeleteFileAndJob_RemoveRecordsAndStoredFiles()
+    public async Task RemoveBuildingAndDeleteJob_RemoveRecords()
     {
         var job = await CreateJobAsync();
         await AddBuildingAsync(job.Id, "Building A");
+        await AddBuildingAsync(job.Id, "Building B");
         var building = (await JobsAsync())[0].Buildings[0];
-        var page = $"/Jobs/{job.Id}/Buildings/{building.Id}";
-        await FormPoster.PostFilesAsync(_client, page, $"{page}/Files", ("a.csv", [1]), ("b.csv", [2]));
-        var files = (await JobsAsync())[0].Buildings[0].UploadedFiles;
+        var editPage = $"/Jobs/{job.Id}/Buildings/{building.Id}/Edit";
 
-        (await FormPoster.PostFormAsync(_client, page, $"{page}/Files/{files[0].Id}/Delete")).EnsureSuccessStatusCode();
-        Assert.Single((await JobsAsync())[0].Buildings[0].UploadedFiles);
-        Assert.Single(Directory.EnumerateFiles(_factory.UploadsDirectory));
+        var removed = await FormPoster.PostFormAsync(_client, editPage, $"/Jobs/{job.Id}/Buildings/{building.Id}/Delete");
+        removed.EnsureSuccessStatusCode();
+        Assert.Contains("Building removed.", await removed.Content.ReadAsStringAsync());
+        Assert.Equal("Building B", Assert.Single((await JobsAsync())[0].Buildings).Name);
 
         (await FormPoster.PostFormAsync(_client, $"/Jobs/Delete/{job.Id}", $"/Jobs/Delete/{job.Id}")).EnsureSuccessStatusCode();
         Assert.Empty(await JobsAsync());
-        Assert.Empty(Directory.EnumerateFiles(_factory.UploadsDirectory));
+    }
+
+    [Fact]
+    public async Task EditBuilding_Saved_ReturnsToJobPage()
+    {
+        var job = await CreateJobAsync();
+        await AddBuildingAsync(job.Id, "Bldg A");
+        var building = (await JobsAsync())[0].Buildings[0];
+        var editPage = $"/Jobs/{job.Id}/Buildings/{building.Id}/Edit";
+
+        var response = await FormPoster.PostFormAsync(_client, editPage, editPage, ("Name", "Building A"), ("Notes", "Roof access"));
+
+        response.EnsureSuccessStatusCode();
+        Assert.Equal($"/Jobs/Details/{job.Id}", response.RequestMessage!.RequestUri!.AbsolutePath);
+        Assert.Contains("Building updated.", await response.Content.ReadAsStringAsync());
+        Assert.Equal("Building A", (await JobsAsync())[0].Buildings[0].Name);
     }
 
     [Fact]

@@ -1,5 +1,5 @@
 // Purpose: Tests recurring jobs against the real database: saving a job as recurring, creating a job from one
-// (details linked, the series' building list used, files not copied), keeping saved details in step with the newest
+// (details linked, the series' building list used, checklist progress not copied), keeping saved details in step with the newest
 // job, series building names locked on the Create form, the standing building list (buildings added to any job in a series reach the list and upcoming jobs; renames
 // follow; removals from one job don't), duplicate names, and removing a recurring job without losing its jobs.
 // The clock is fixed to Nov 3, 2026, so 2027 jobs are "upcoming".
@@ -24,14 +24,15 @@ public class RecurringJobServiceTests : IDisposable
     private JobService Jobs => _harness.JobService;
     private RecurringJobService Recurring => _harness.RecurringJobService;
 
-    /// <summary>Creates the 2026 job saved as recurring, with Building A (with a file), Building B, and Parking Garage.</summary>
+    /// <summary>Creates the 2026 job saved as recurring (John assigned), with Building A (checked off), Building B, and Parking Garage.</summary>
     private async Task<Job> CreateSeriesAsync()
     {
-        var job = await Jobs.CreateAsync(ServiceHarness.ValidJob() with { SaveAsRecurring = true });
+        var tech = await _harness.TechnicianService.AddAsync("John", "Smith");
+        var job = await Jobs.CreateAsync(ServiceHarness.ValidJob(tech.Id) with { SaveAsRecurring = true });
         var a = (await Jobs.AddBuildingAsync(job.Id, "Building A", "Panel in basement"))!;
         await Jobs.AddBuildingAsync(job.Id, "Building B", null);
         await Jobs.AddBuildingAsync(job.Id, "Parking Garage", null);
-        await _harness.FileService.UploadAsync(job.Id, a.Id, "devices.csv", new MemoryStream([1, 2, 3]), 3);
+        await Jobs.SetBuildingCompleteAsync(job.Id, a.Id, tech.Id, complete: true);
         return (await Jobs.GetAsync(job.Id))!;
     }
 
@@ -59,7 +60,7 @@ public class RecurringJobServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task CreateAsync_FromRecurringJob_CopiesBuildingNamesNotesAndOrderButNotFiles()
+    public async Task CreateAsync_FromRecurringJob_CopiesBuildingNamesNotesAndOrderButNotChecklistProgress()
     {
         var first = await CreateSeriesAsync();
 
@@ -69,10 +70,10 @@ public class RecurringJobServiceTests : IDisposable
         Assert.Equal(first.RecurringJobId, reloaded.RecurringJobId);
         Assert.Equal(["Building A", "Building B", "Parking Garage"], reloaded.Buildings.Select(b => b.Name));
         Assert.Equal("Panel in basement", reloaded.Buildings[0].Notes);
-        Assert.All(reloaded.Buildings, b => Assert.Empty(b.UploadedFiles));
+        Assert.All(reloaded.Buildings, b => Assert.False(b.IsComplete));
         Assert.Empty(reloaded.Buildings.Select(b => b.Id).Intersect(first.Buildings.Select(b => b.Id)));
         var original = (await Jobs.GetAsync(first.Id))!;
-        Assert.Single(original.Buildings[0].UploadedFiles);
+        Assert.True(original.Buildings[0].IsComplete);
         Assert.Equal(3, original.Buildings.Count);
     }
 

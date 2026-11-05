@@ -1,4 +1,5 @@
-@* Team lead job page: job facts, and the job's buildings with links to manage each building's files. *@
+@* Team lead job page: job facts with the files link, and the job's buildings with each one's checklist progress
+   (ticked off by technicians), a link to edit or remove it, and a form to add one. *@
 @model JobDetailsViewModel
 @{
     ViewData["Title"] = Model.Summary.Name;
@@ -23,27 +24,42 @@
     <partial name="_JobInfo" model="Model" />
 </div>
 
-<div class="card">
+<div class="card" id="buildings">
     <div class="card-header fw-semibold">Buildings</div>
     @if (Model.Buildings.Count == 0)
     {
-        <div class="card-body text-body-secondary">No buildings yet. Add each building at this location, then upload its device spreadsheets.</div>
+        <div class="card-body text-body-secondary">No buildings yet. Add each building at this location; technicians check them off as they finish.</div>
     }
     else
     {
+        <div class="card-body border-bottom">
+            <partial name="_BuildingProgress" model="Model" />
+            <div class="form-text mt-2 mb-0">Technicians check buildings off from their job page. Select a building to rename or remove it.</div>
+        </div>
         <div class="list-group list-group-flush">
             @foreach (var building in Model.Buildings)
             {
-                <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
-                   asp-controller="Buildings" asp-action="Details" asp-route-jobId="@Model.Summary.Id" asp-route-buildingId="@building.Id">
-                    <span>
+                <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center gap-2"
+                   asp-controller="Buildings" asp-action="Edit" asp-route-jobId="@Model.Summary.Id" asp-route-buildingId="@building.Id"
+                   data-building-status="@(building.IsComplete ? "complete" : "todo")">
+                    <span class="text-break">
                         <strong>@building.Name</strong>
                         @if (building.Notes is not null)
                         {
-                            <span class="small text-body-secondary d-block">@building.Notes</span>
+                            <span class="small text-body-secondary d-block notes">@building.Notes</span>
                         }
                     </span>
-                    <span class="badge text-bg-secondary">@building.Files.Count file(s)</span>
+                    <span class="text-end flex-shrink-0">
+                        @if (building.IsComplete)
+                        {
+                            <span class="badge text-bg-success">Complete</span>
+                            <span class="small text-body-secondary d-block">@building.CompletedText</span>
+                        }
+                        else
+                        {
+                            <span class="badge text-bg-secondary">To do</span>
+                        }
+                    </span>
                 </a>
             }
         </div>

@@ -1,7 +1,10 @@
-@* Technician job page (read-only): job facts and each building's spreadsheets to download. *@
+@* Technician job page: job facts, the link to the job's files, and the building checklist split into "To do" and
+   "Completed". Ticking a building moves it between the two lists (wwwroot/js/building-checklist.js). *@
 @model TechnicianJobViewModel
 @{
     ViewData["Title"] = Model.Job.Summary.Name;
+    var todo = Model.ItemsWhere(complete: false);
+    var done = Model.ItemsWhere(complete: true);
 }
 
 <a class="btn btn-sm btn-outline-secondary mb-3" asp-action="Index" asp-route-technicianId="@Model.Technician.Id">&larr; My schedule</a>
@@ -13,36 +16,41 @@
     <partial name="_JobInfo" model="Model.Job" />
 </div>
 
-<h2 class="h5">Buildings</h2>
-@if (Model.Job.Buildings.Count == 0)
-{
-    <p class="text-body-secondary">No buildings have been added to this job yet.</p>
-}
-@foreach (var building in Model.Job.Buildings)
-{
-    <div class="card mb-3" id="building-@building.Id">
-        <div class="card-header fw-semibold">@building.Name</div>
-        @if (building.Notes is not null)
+<section class="building-checklist" id="checklist" data-checklist aria-labelledby="checklist-title">
+    <h2 class="h5" id="checklist-title">Buildings</h2>
+    @if (Model.Job.Buildings.Count == 0)
+    {
+        <p class="text-body-secondary">No buildings have been added to this job yet.</p>
+    }
+    else
+    {
+        <partial name="_BuildingProgress" model="Model.Job" />
+        @if (!Model.CanCheckOffBuildings)
         {
-            <div class="card-body pb-0 notes small">@building.Notes</div>
+            <p class="small text-body-secondary mt-2 mb-0">Only @Model.Technician.FullName can check buildings off this list.</p>
         }
-        @if (building.Files.Count == 0)
-        {
-            <div class="card-body text-body-secondary small">No spreadsheets uploaded for this building.</div>
-        }
-        else
-        {
-            <div class="list-group list-group-flush">
-                @foreach (var file in building.Files)
-                {
-                    <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center file-link"
-                       asp-controller="Buildings" asp-action="Download"
-                       asp-route-jobId="@Model.Job.Summary.Id" asp-route-buildingId="@building.Id" asp-route-fileId="@file.Id">
-                        <span class="text-break">@file.OriginalFileName</span>
-                        <span class="btn btn-sm btn-primary ms-2">Download</span>
-                    </a>
-                }
-            </div>
-        }
-    </div>
+        <div class="alert alert-danger py-2 small mt-3 mb-0" role="alert" data-checklist-error hidden></div>
+
+        <h3 class="checklist-heading">To do <span class="badge text-bg-secondary" data-count="todo">@todo.Count</span></h3>
+        <ul class="list-group checklist-list" data-list="todo" aria-label="Buildings to do">
+            @foreach (var item in todo)
+            {
+                <partial name="_ChecklistItem" model="item" />
+            }
+        </ul>
+        <p class="checklist-empty" data-empty="todo" hidden="@(todo.Count > 0)">Every building is complete.</p>
+
+        <h3 class="checklist-heading">Completed <span class="badge text-bg-success" data-count="done">@done.Count</span></h3>
+        <ul class="list-group checklist-list" data-list="done" aria-label="Completed buildings">
+            @foreach (var item in done)
+            {
+                <partial name="_ChecklistItem" model="item" />
+            }
+        </ul>
+        <p class="checklist-empty" data-empty="done" hidden="@(done.Count > 0)">Nothing checked off yet. Tick each building as you finish it.</p>
+    }
+</section>
+
+@section Scripts {
+    <script src="~/js/building-checklist.js" asp-append-version="true"></script>
 }

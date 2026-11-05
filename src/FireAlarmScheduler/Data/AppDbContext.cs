@@ -1,6 +1,7 @@
 // Purpose: EF Core database context for the app: scheduling tables (technicians, jobs, assignments,
-// buildings, file metadata, PTO requests, recurring jobs) plus the ASP.NET Core Identity tables for users and roles.
+// buildings, PTO requests, recurring jobs) plus the ASP.NET Core Identity tables for users and roles.
 using FireAlarmScheduler.Entities;
+using FireAlarmScheduler.Services;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
@@ -12,7 +13,6 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
     public DbSet<Job> Jobs => Set<Job>();
     public DbSet<JobAssignment> JobAssignments => Set<JobAssignment>();
     public DbSet<Building> Buildings => Set<Building>();
-    public DbSet<UploadedFile> UploadedFiles => Set<UploadedFile>();
     public DbSet<PtoRequest> PtoRequests => Set<PtoRequest>();
     public DbSet<RecurringJob> RecurringJobs => Set<RecurringJob>();
     public DbSet<RecurringJobBuilding> RecurringJobBuildings => Set<RecurringJobBuilding>();
@@ -41,6 +41,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
             e.Property(j => j.SiteName).HasMaxLength(200);
             e.Property(j => j.Address).HasMaxLength(300);
             e.Property(j => j.Notes).HasMaxLength(4000);
+            e.Property(j => j.FilesUrl).HasMaxLength(JobFilesLink.MaxLength);
             e.Property(j => j.Status).HasConversion<string>().HasMaxLength(20);
             e.Ignore(j => j.AssignedTechnicianIds);
             e.HasIndex(j => j.StartDate);
@@ -60,15 +61,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
             e.Property(b => b.Id).ValueGeneratedNever();
             e.Property(b => b.Name).HasMaxLength(100);
             e.Property(b => b.Notes).HasMaxLength(2000);
-            e.HasMany(b => b.UploadedFiles).WithOne().HasForeignKey(f => f.BuildingId).OnDelete(DeleteBehavior.Cascade);
-        });
-
-        builder.Entity<UploadedFile>(e =>
-        {
-            e.Property(f => f.Id).ValueGeneratedNever();
-            e.Property(f => f.OriginalFileName).HasMaxLength(150);
-            e.Property(f => f.StoredFileName).HasMaxLength(100);
-            e.HasIndex(f => f.StoredFileName).IsUnique();
+            e.Ignore(b => b.IsComplete);
+            // Deleting a technician keeps the buildings they checked off, just without a name against them.
+            e.HasOne<Technician>().WithMany().HasForeignKey(b => b.CompletedByTechnicianId).OnDelete(DeleteBehavior.SetNull);
         });
 
         // Removing a recurring job keeps its jobs; they just stop being linked to it.

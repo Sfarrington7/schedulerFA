@@ -1,6 +1,6 @@
 # Fire Alarm Field Scheduler
 
-A lightweight scheduling website for fire alarm testing teams. The goal is to give field technicians the job information and building-specific spreadsheets they need without contacting the office for routine schedule details or documents.
+A lightweight scheduling website for fire alarm testing teams. The goal is to give field technicians the job information, a link to each job's files, and a checklist of the buildings left to test, without contacting the office for routine schedule details or documents.
 
 > **Status:** First working MVP. Every feature in the MVP scope below works locally, and the primary workflow is covered by an automated end-to-end test. Not ready for deployment; see *Safety and limitations*.
 
@@ -12,20 +12,20 @@ Everyone signs in with an account (ASP.NET Core Identity). Each account has one 
 | --- | --- |
 | **SuperAdmin** | Everything an Admin can do, including creating and managing Admin and SuperAdmin accounts. |
 | **Admin** | Manage TeamLead and Technician accounts, plus everything a team lead can do. |
-| **TeamLead** | Add technicians; create and update jobs; assign technicians; add buildings; upload or remove building spreadsheets; see every technician's schedule; approve, deny, or revoke PTO; review scheduling conflicts. |
-| **Technician** | See their own daily, weekly, or monthly schedule and download spreadsheets for jobs they are assigned to. Request PTO and cancel requests that are still pending. A technician account is linked to one technician record. |
+| **TeamLead** | Add technicians; create and update jobs; assign technicians; add buildings and a link to the job's files; see every technician's schedule and each job's building progress; approve, deny, or revoke PTO; review scheduling conflicts. |
+| **Technician** | See their own daily, weekly, or monthly schedule; open the files link and check buildings off for jobs they are assigned to. Request PTO and cancel requests that are still pending. A technician account is linked to one technician record. |
 
 ## MVP scope
 
 1. **Team management:** Add, edit, list, and remove technicians.
 2. **Accounts and roles:** Sign-in, first-run SuperAdmin setup, and Users/Roles management screens (create, edit roles, link a technician, reset password, lock/unlock, delete).
-3. **Jobs and assignments:** Create/edit/delete a job with a name, optional customer, address, start/end dates and times, status, notes, and assigned technicians. Technicians are picked from a dropdown that marks each one **Free** or **Conflict** for the job's dates and hours (and says why); a conflicting technician can still be assigned, with a warning.
-4. **Buildings:** Associate multiple named buildings with a job, each with its own notes and attachments.
-5. **Spreadsheet files:** Upload, list, download, and delete `.xlsx`, `.xls`, or `.csv` attachments per building. Files are transferred as-is; the app does not edit or analyze spreadsheet contents.
+3. **Jobs and assignments:** Create/edit/delete a job with a name, optional customer, address, an optional **job files link**, start/end dates and times, status, notes, and assigned technicians. Technicians are picked from a dropdown that marks each one **Free** or **Conflict** for the job's dates and hours (and says why); a conflicting technician can still be assigned, with a warning.
+4. **Buildings:** Associate multiple named buildings with a job, each with its own notes. On their job page, technicians see the buildings as a checklist split into **To do** and **Completed**; ticking a building moves it straight across and updates a progress bar ("2 of 5 buildings complete"). Team leads see the same progress on the job page, with who checked each building off and when.
+5. **Job files:** The job's files (device lists, drawings, reports) live outside the app, for example in a shared Google Drive folder. The team lead pastes its link on the job form, and technicians open it from their job page in a new tab. Any website is accepted. The app no longer stores uploaded files.
 6. **Field schedule:** A mobile-friendly technician view with day, week (every day listed top to bottom), and month (calendar) views, plus job/building details.
 7. **Team lead overview:** The dashboard opens with four summary cards (jobs today, upcoming in the next 14 days, pending PTO, conflicts), each linking to its page, then lists current and upcoming jobs, technicians, and the next two weeks. In the sidebar, PTO Requests and Conflicts show a red count badge whenever something needs attention.
 8. **PTO:** Technicians request time off (start/end date and time, optional reason) on **My PTO**. Team leads and admins approve, deny, or revoke requests on **PTO Requests**, which warns when a request overlaps the technician's jobs. **Conflicts** lists double-booked technicians and technicians scheduled during approved PTO.
-9. **Recurring jobs and buildings:** Buildings are entered right on the **Create Job** form (add or remove rows; more can be added later from the job page). Tick **Save as a recurring job** to keep the job's name, customer, site, address, and building list. Next time, choose it from the **Job / project** list: the details and building rows fill in; the recurring job's buildings can't be renamed there (notes can be added, and a building can be removed for that round), and new buildings can be added. A building added to any job in a series (or on the recurring job's own page) joins the series' building list and its upcoming jobs; spreadsheets are never copied. **Jobs → Recurring jobs** lists them; each has a page to manage its building list.
+9. **Recurring jobs and buildings:** Buildings are entered right on the **Create Job** form (add or remove rows; more can be added later from the job page). Tick **Save as a recurring job** to keep the job's name, customer, site, address, and building list. Next time, choose it from the **Job / project** list: the details and building rows fill in; the recurring job's buildings can't be renamed there (notes can be added, and a building can be removed for that round), and new buildings can be added. A building added to any job in a series (or on the recurring job's own page) joins the series' building list and its upcoming jobs; checklist progress is never copied. **Jobs → Recurring jobs** lists them; each has a page to manage its building list.
 
 ### Out of scope for version one
 
@@ -40,7 +40,7 @@ Self-service registration, password-reset emails, two-factor sign-in, multi-comp
 | UI | ASP.NET Core MVC with Razor views (no code-behind) |
 | Data persistence | EF Core 10 with SQL Server on `localhost` (database `FireAlarmScheduler`), schema managed by migrations |
 | Accounts and roles | ASP.NET Core Identity (MVC screens, no Razor Pages UI) |
-| Uploaded documents | Local filesystem, outside `wwwroot` |
+| Job files | Not stored by the app: each job links to an outside folder (for example Google Drive) |
 | Look and feel | Bootstrap 5.3 restyled by `wwwroot/css/site.css` ("Clean Slate": dark sidebar, slate neutrals, blue accent); line icons in `wwwroot/img/icons.svg` |
 | Testing | xUnit (`dotnet test`); browser layout tests with Microsoft.Playwright (headless Chromium) |
 | Deployment | Local development only, initially |
@@ -53,8 +53,8 @@ Services depend on repository interfaces, so the database provider can change (f
 2. The lead creates **Central Plaza Annual Fire Alarm Inspection**, scheduled **November 2–6, 2026** at **100 Main Street**.
 3. The lead assigns John and Mike.
 4. The lead adds **Building A**, **Building B**, and **Parking Garage**.
-5. The lead uploads a separate device-testing spreadsheet to each building.
-6. John signs in with his Technician account, sees the job on **My Schedule**, opens it, selects Building A, and downloads its spreadsheet.
+5. The lead pastes a link to the job's shared Google Drive folder on the job form.
+6. John signs in with his Technician account, sees the job on **My Schedule**, opens it, opens the job files, and checks Building A off once it's tested. The lead sees "1 of 3 buildings complete" on the job page.
 
 The automated workflow test (`WorkflowTests`) runs these steps over HTTP with real sign-ins.
 
@@ -66,13 +66,13 @@ schedulerFA/
 ├── CLAUDE.md / README.md
 ├── src/FireAlarmScheduler/           # ASP.NET Core MVC application
 │   ├── Program.cs                    # Startup: database, Identity, authorization policies, services
-│   ├── appsettings.json              # Connection string; "Storage" section: upload folder, max file size
+│   ├── appsettings.json              # Connection string and logging
 │   ├── Controllers/                  # Home, Schedule, Jobs, Buildings, Technicians, TechnicianView, Account, Users, Roles; TimeOffNav view component
 │   ├── Views/                        # Razor views, one folder per controller, plus Shared/
 │   ├── Models/                       # View models and form models (what views see)
-│   ├── Entities/                     # Technician, Job, JobAssignment, Building, UploadedFile, ApplicationUser (SQL tables)
+│   ├── Entities/                     # Technician, Job, JobAssignment, Building, PtoRequest, RecurringJob, ApplicationUser (SQL tables)
 │   ├── Data/                         # AppDbContext, startup migration/role seeding, Migrations/
-│   ├── Services/                     # Business rules, EF Core repositories, account rules, local file storage
+│   ├── Services/                     # Business rules, EF Core repositories, account rules
 │   ├── wwwroot/                      # CSS, scripts, icons, and Bootstrap/jQuery (public static files only)
 │   └── App_Data/                     # Created at runtime; ignored by Git (see below)
 └── tests/
@@ -83,8 +83,8 @@ schedulerFA/
 ### How the pieces connect
 
 1. A **controller** receives the request (for example `JobsController.Create`), and calls a **service**.
-2. **Services** (`TechnicianService`, `JobService`, `BuildingFileService`, `UserAdministrationService`) enforce the rules: required fields, end date after start date, allowed file types and size. A broken rule throws `ValidationFailedException`, and the controller shows those messages on the form.
-3. Services save data through **repository interfaces** (`ITechnicianRepository`, `IJobRepository`), implemented with EF Core (`EfTechnicianRepository`, `EfJobRepository`), and **`IFileStorage`** (a local folder). Accounts and roles go through Identity's `UserManager`.
+2. **Services** (`TechnicianService`, `JobService`, `UserAdministrationService`, `PtoService`) enforce the rules: required fields, end date after start date, a files link that is a real web address, only assigned technicians ticking buildings. A broken rule throws `ValidationFailedException`, and the controller shows those messages on the form.
+3. Services save data through **repository interfaces** (`ITechnicianRepository`, `IJobRepository`), implemented with EF Core (`EfTechnicianRepository`, `EfJobRepository`). Accounts and roles go through Identity's `UserManager`.
 4. **Authorization** is declared on controllers with three policies from `Services/AppRoles.cs`: `ManageSchedule` (TeamLead, Admin, SuperAdmin), `ManageUsers` (Admin, SuperAdmin), and `ViewSchedule` (any role). Every other page requires sign-in by default.
 5. The controller maps **entities** to **view models** in `Models/` and returns a view. Views only display data.
 
@@ -92,12 +92,11 @@ schedulerFA/
 
 | What | Default location |
 | --- | --- |
-| All records (technicians, jobs, assignments, buildings, file metadata, users, roles) | SQL Server database `FireAlarmScheduler` on `localhost` (`ConnectionStrings:DefaultConnection`) |
-| Uploaded spreadsheets | `src/FireAlarmScheduler/App_Data/uploads/` (stored as `<random id>.<ext>`; `Storage:UploadsDirectory`) |
+| All records (technicians, jobs, assignments, buildings and their checklist progress, users, roles) | SQL Server database `FireAlarmScheduler` on `localhost` (`ConnectionStrings:DefaultConnection`) |
 
-The upload path resolves against the project folder. `App_Data` is outside `wwwroot`, so uploads are only reachable through the app's download links, and it is ignored by Git. On startup the app creates the database if needed, applies any pending EF Core migrations, and creates the four roles if they are missing. To reset the app, stop it, drop the `FireAlarmScheduler` database, and delete `App_Data/uploads`.
+On startup the app creates the database if needed, applies any pending EF Core migrations, and creates the four roles if they are missing. To reset the app, stop it and drop the `FireAlarmScheduler` database. Earlier builds stored uploaded spreadsheets in `App_Data/uploads`; the `ReplaceFileUploadsWithFilesLinkAndChecklist` migration drops their records, and that folder (ignored by Git) can be deleted by hand.
 
-Tables: `Technicians`, `Jobs`, `JobAssignments` (job ↔ technician), `Buildings`, `UploadedFiles`, plus the Identity tables (`AspNetUsers`, `AspNetRoles`, `AspNetUserRoles`, …). Deleting a job cascades to its assignments, buildings, and file records; deleting a technician removes their assignments and unlinks their account.
+Tables: `Technicians`, `Jobs`, `JobAssignments` (job ↔ technician), `Buildings`, `PtoRequests`, `RecurringJobs`, `RecurringJobBuildings`, plus the Identity tables (`AspNetUsers`, `AspNetRoles`, `AspNetUserRoles`, …). Deleting a job cascades to its assignments and buildings; deleting a technician removes their assignments and unlinks their account, and buildings they checked off stay complete without their name.
 
 **Older JSON data is not imported.** Earlier builds stored data in `App_Data/technicians.json` and `jobs.json`. The app no longer reads those files and leaves them untouched.
 
@@ -152,8 +151,8 @@ With no accounts in the database, the app opens **First-time setup**. Create the
 2. **Users → Add user**: create `john@example.test` with the **Technician** role, linked to John Smith.
 3. **Dashboard → Create job**: "Central Plaza Annual Fire Alarm Inspection", 100 Main Street, Nov 2–6, 2026, and tick John and Mike.
 4. On the job page, add **Building A**, **Building B**, and **Parking Garage**.
-5. Open each building and upload its `.xlsx`, `.xls`, or `.csv` file.
-6. **Sign out**, sign in as John, open the job from **My Schedule**, and download Building A's file.
+5. **Edit job**, paste a link to the job's files (for example a shared Google Drive folder) into **Job files link**, and save.
+6. **Sign out**, sign in as John, open the job from **My Schedule**, tap **Open job files**, and tick **Building A**. Sign back in as the SuperAdmin to see "1 of 3 buildings complete" on the job page.
 
 The **Jobs** page has two tabs: **List** (every job in a table) and **Calendar**, a month view of jobs only (technicians are on the Schedule page's month view). Each job is one solid-colored bar spanning the days it runs, so it's easy to see how long each job takes and to tell jobs apart; the month's jobs, with matching color swatches and how many days each takes, are listed underneath.
 
@@ -175,16 +174,16 @@ Key expectations:
 **Do not put this version on the public internet or populate it with real customer, building, or employee information.** It now has sign-in and role-based authorization, but it has not had a security review, and real deployment still needs HTTPS-only hosting, a production database with backups, secret management, and email-based password recovery.
 
 - Until the first SuperAdmin is created, anyone who can reach the app can open the setup page and become SuperAdmin. Create that account immediately after the first start.
-- Technician accounts can only see their own schedule and download files for jobs they are assigned to; this is enforced on the server, not just hidden in the UI.
+- Technician accounts can only see their own schedule and jobs, and only check buildings off on jobs they are assigned to; this is enforced on the server, not just hidden in the UI.
 - Role changes, locks, and deletions take effect for signed-in users within about a minute (security-stamp validation).
-- File uploads are untrusted. Types and sizes are validated on the server; files are stored outside `wwwroot` under generated names and served only through the download action.
+- Job files links must be `http`/`https` addresses (checked on the server), so a pasted `javascript:` or `data:` link can't run in someone's browser. They open in a new tab without passing the app's address on. Who can open the linked folder is controlled by the site it points to (for example the Google Drive sharing settings), not by this app.
 
 ## Development order
 
 1. Scaffold .NET 10 ASP.NET Core MVC app and xUnit test project; document setup.
 2. Add technician management with JSON persistence and tests (later moved to EF Core).
 3. Add jobs, scheduling, technician assignments, and tests.
-4. Add buildings and secure file upload/download functionality with tests.
+4. Add buildings and secure file upload/download functionality with tests (later replaced by a job files link and a building checklist).
 5. Build technician day/week schedule and mobile-friendly views.
 6. Test the complete primary workflow and fix usability issues.
 7. Replace JSON storage with EF Core (now SQL Server on localhost) and add Identity sign-in, four roles, and user/role management.
@@ -196,7 +195,7 @@ Key expectations:
 - **Decision (attention counts):** The dashboard cards and sidebar badges use `ScheduleAlertService`, which counts PTO requests still pending (whatever their dates, as the PTO Requests page does) and conflicts from today on (as the Conflicts page lists them, one per technician and job pair). It is worked out once per page load and shared by the dashboard and the sidebar, so the numbers always agree and every change shows on the next page. "Jobs today" counts every job running today (as "Current jobs" lists them); "Upcoming" counts jobs starting after today and within 14 days, counting today as day 1. A badge is hidden at zero and shows "99+" above 99. The sidebar's Time off group is a view component (`TimeOffNavViewComponent`) so the layout doesn't look data up itself; it is shown only to roles that review PTO.
 - **Decision (PTO):** A request is one continuous period from a start date/time to an end date/time; whole days default to 12:00 AM–11:59 PM. Requests can't start before today or overlap the technician's own pending or approved requests. Technicians can cancel only pending requests (cancelling deletes them); admins can approve, deny, or revoke (deny an approved request). Team leads, Admins, and SuperAdmins review PTO and see the Conflicts page. Approved PTO does not block assigning the technician to a job; it shows up on the Conflicts page instead.
 - **Decision (PTO on calendars):** Approved PTO shows as a striped "PTO" block on the team lead's Week grid and Month calendar (only for ticked technicians, with their colored initials) and on a technician's Day, Week, and Month views. Partial days show their hours ("From 12:00 PM", "Until 10:30 AM", or a range); time off that runs to 11:59 PM or past midnight counts as the rest of the day. Pending and denied requests are never shown on calendars.
-- **Decision (recurring jobs):** A recurring job (`RecurringJobs`) stores name, customer, site, and address plus a standing building list (`RecurringJobBuildings`); jobs link to it with `Jobs.RecurringJobId`. A new job in the series starts with that list. On the Create form those rows' names are read-only, and the server enforces it: each such row carries its recurring building's ID and is saved under the saved name, whatever name is posted. Rows can still be removed for one round, given notes, or added. Adding a building to any job in the series, or on the recurring job's page, adds it to the list (if the name isn't already there) and to the series' upcoming jobs (start date after today, not completed). Renaming a building on a series job renames it on the list. Removing a building from one job doesn't change the list (a building can be skipped for one round); remove it on the recurring job's page to stop including it. Spreadsheets are never copied. The saved details follow the newest job in the series. Recurring job names must be unique. The `AddRecurringJobBuildings` migration seeds each existing list from that series' newest job.
+- **Decision (recurring jobs):** A recurring job (`RecurringJobs`) stores name, customer, site, and address plus a standing building list (`RecurringJobBuildings`); jobs link to it with `Jobs.RecurringJobId`. A new job in the series starts with that list. On the Create form those rows' names are read-only, and the server enforces it: each such row carries its recurring building's ID and is saved under the saved name, whatever name is posted. Rows can still be removed for one round, given notes, or added. Adding a building to any job in the series, or on the recurring job's page, adds it to the list (if the name isn't already there) and to the series' upcoming jobs (start date after today, not completed). Renaming a building on a series job renames it on the list. Removing a building from one job doesn't change the list (a building can be skipped for one round); remove it on the recurring job's page to stop including it. Checklist progress is never copied. The saved details follow the newest job in the series. Recurring job names must be unique. The `AddRecurringJobBuildings` migration seeds each existing list from that series' newest job.
 - **Decision (conflicts):** A technician is double-booked when two of their jobs share a day and their daily hours overlap (hours that only touch, like 8–12 and 12–4, are fine). A job conflicts with PTO when its hours on any day overlap the PTO period. Completed jobs and days before today are ignored; pending PTO appears as a warning on PTO Requests, not on the Conflicts page.
 - **Decision (technician picker):** The job form's technician dropdown uses the same rules as the Conflicts page: a technician is marked **Conflict** when another active job's hours overlap this job's on a shared day, or when the job's hours fall in their approved PTO. The job being edited never conflicts with itself, and the whole job is checked (including days before today). Conflicts are a warning, not a block: the team lead can still assign the technician, and the form lists what they clash with. The marks refresh from the server (`GET /Jobs/TechnicianAvailability`) when the dates or hours change; with JavaScript off, the list shows open under the field with the marks from when the page loaded. Pending PTO isn't flagged.
 - **Decision:** Store all records in SQL Server tables through EF Core, using a local SQL Server (`localhost`) for development. Tests use throwaway databases on a SQL Server too, so they run against the same provider and migrations as the app.
@@ -205,9 +204,11 @@ Key expectations:
 - **Decision:** The first SuperAdmin is created through a setup page that only works while the database has no accounts, so no default password is committed to the repository.
 - **Decision:** Each technician account links to at most one technician record; the Technician role requires a link.
 - **Decision:** Use ASP.NET Core MVC instead of Blazor, with separate `Controllers/`, `Views/`, `Models/`, and `Entities/` folders and no Razor code-behind.
-- **Decision:** Buildings keep the order they were added (`SortOrder`); file bytes live outside the database under generated names.
+- **Decision:** Buildings keep the order they were added (`SortOrder`).
+- **Decision (job files link):** File uploads were removed in favour of one link per job (`Jobs.FilesUrl`) to wherever the team keeps the job's files. Any website is allowed; the only rule is that it's an `http`/`https` address (a link pasted without one gets `https://`), because anything else could run script when clicked. The link isn't saved on recurring jobs, since each round usually has its own folder.
+- **Decision (building checklist):** Each building stores when it was checked off (`CompletedAtUtc`) and by which technician (`CompletedByTechnicianId`). Only the signed-in technician's own account, assigned to the job, can tick or untick; team leads see the checklist read-only and the progress on the job page. Ticking a building that is already complete keeps the first technician's name. The checklist saves each tick straight away with a small script (`wwwroot/js/building-checklist.js`) and moves the building between the lists; with scripts off, each building has a Save button. Completion doesn't change the job's status.
 - **Decision:** Job times are daily working hours that apply to every day from the start date to the end date.
-- **Decision:** Building names must be unique within a job. Deleting a technician unassigns them from all jobs. Deleting a job or building deletes its files.
+- **Decision:** Building names must be unique within a job. Deleting a technician unassigns them from all jobs.
 - **Decision (job bars):** On the Schedule and technician month calendars, each job keeps one line (lane) across its days within a week row, so its days join into one bar; earlier and longer jobs take the top lines, and an empty gap keeps later lines aligned. Approved PTO is listed under the day's jobs so it doesn't break the bars. Bars are tinted by status on desktop; on phones they shrink to dots and initials.
 - **Decision (Jobs calendar):** The Jobs calendar uses the same lanes but draws each job as a single bar per week row (a CSS grid over the seven days), with no technician tags. A job that runs past Sunday continues on the next row with square ends. Jobs are colored in start order, cycling through 10 colors, so neighboring jobs differ; a job's color can change from month to month.
 - **Decision:** Month calendars run Monday–Sunday and include the days from neighboring months that fill the first and last rows. The team lead's month view shows every technician until the picker is used; the choice is kept in the page address (so Previous/Next keep it), not saved per user. Technician colors follow the technician list order, so a technician's color can change when technicians are added or removed.

@@ -1,6 +1,6 @@
-// Purpose: The technician-facing, read-only pages: a daily, weekly, or monthly schedule (jobs and approved PTO) and assigned job details
-// with building spreadsheets. Technician accounts only ever see their own linked technician;
-// team leads and administrators can pick any technician.
+// Purpose: The technician-facing pages: a daily, weekly, or monthly schedule (jobs and approved PTO) and assigned job
+// details with the job files link and a building checklist the technician ticks off. Technician accounts only ever see
+// their own linked technician; team leads and administrators can pick any technician and view their checklist read-only.
 using FireAlarmScheduler.Entities;
 using FireAlarmScheduler.Models;
 using FireAlarmScheduler.Services;
@@ -121,14 +121,15 @@ public class TechnicianViewController : Controller
     };
 
     /// <summary>
-    /// Shows a job's details and files, but only if it is assigned to the chosen technician.
+    /// Shows a job's details, files link, and building checklist, but only if it is assigned to the chosen technician.
     /// Technician accounts are always treated as their own linked technician, whatever the URL says.
     /// </summary>
     public async Task<IActionResult> Job(Guid id, Guid technicianId)
     {
+        var linkedTechnicianId = await _userManager.GetLinkedTechnicianIdAsync(User);
         if (!User.CanManageSchedule())
         {
-            technicianId = await _userManager.GetLinkedTechnicianIdAsync(User) ?? Guid.Empty;
+            technicianId = linkedTechnicianId ?? Guid.Empty;
         }
 
         var technician = await _technicianService.GetAsync(technicianId);
@@ -142,7 +143,33 @@ public class TechnicianViewController : Controller
         return View(new TechnicianJobViewModel
         {
             Technician = new TechnicianOption(technician.Id, technician.FullName),
-            Job = JobDetailsViewModel.FromEntity(job, lookup)
+            Job = JobDetailsViewModel.FromEntity(job, lookup),
+            CanCheckOffBuildings = linkedTechnicianId == technician.Id
         });
+    }
+
+    /// <summary>
+    /// Checks a building off the signed-in technician's checklist, or puts it back on the to-do list. Only the user's
+    /// own linked technician counts, and they must be assigned to the job; otherwise 404. Answers the checklist script
+    /// (which asks for JSON) with the building's new state, and a plain form post by going back to the job page.
+    /// </summary>
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> SetBuildingComplete(Guid id, Guid buildingId, bool complete)
+    {
+        var technicianId = await _userManager.GetLinkedTechnicianIdAsync(User);
+        var building = technicianId is null ? null : await _jobService.SetBuildingCompleteAsync(id, buildingId, technicianId.Value, complete);
+        if (building is null)
+        {
+            return NotFound();
+        }
+
+        if (Request.GetTypedHeaders().Accept.Any(a => a.MediaType == "application/json"))
+        {
+            var technicians = (await _technicianService.GetAllAsync()).ToLookup();
+            var model = BuildingViewModel.FromEntity(building, technicians);
+            return Json(new { model.IsComplete, model.CompletedText });
+        }
+
+        return RedirectToAction(nameof(Job), null, new { id, technicianId }, "checklist");
     }
 }

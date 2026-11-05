@@ -1,6 +1,6 @@
 // Purpose: Job scheduling rules: create, edit, and delete jobs with their buildings, assign technicians, link jobs to
-// recurring jobs, manage a job's buildings (keeping a series' building list and upcoming jobs in step), and answer
-// date-range schedule queries.
+// recurring jobs, manage a job's buildings (keeping a series' building list and upcoming jobs in step), let assigned
+// technicians check buildings off, and answer date-range schedule queries.
 using FireAlarmScheduler.Entities;
 
 namespace FireAlarmScheduler.Services;
@@ -9,16 +9,13 @@ public class JobService
 {
     private readonly IJobRepository _jobs;
     private readonly ITechnicianRepository _technicians;
-    private readonly IFileStorage _fileStorage;
     private readonly RecurringJobService _recurringJobs;
     private readonly TimeProvider _timeProvider;
 
-    public JobService(IJobRepository jobs, ITechnicianRepository technicians, IFileStorage fileStorage,
-        RecurringJobService recurringJobs, TimeProvider timeProvider)
+    public JobService(IJobRepository jobs, ITechnicianRepository technicians, RecurringJobService recurringJobs, TimeProvider timeProvider)
     {
         _jobs = jobs;
         _technicians = technicians;
-        _fileStorage = fileStorage;
         _recurringJobs = recurringJobs;
         _timeProvider = timeProvider;
     }
@@ -134,6 +131,7 @@ public class JobService
             job.EndTime = validated.EndTime;
             job.Status = validated.Status;
             job.Notes = validated.Notes;
+            job.FilesUrl = validated.FilesUrl;
             job.SetAssignedTechnicians(validated.AssignedTechnicianIds);
             return true;
         });
@@ -146,23 +144,37 @@ public class JobService
         return updated;
     }
 
+    /// <summary>Deletes the job and its buildings. Returns false if not found.</summary>
+    public async Task<bool> DeleteAsync(Guid id) => await _jobs.DeleteAsync(id) is not null;
 
-    /// <summary>Deletes the job and every spreadsheet stored for its buildings. Returns false if not found.</summary>
-    public async Task<bool> DeleteAsync(Guid id)
-    {
-        var job = await _jobs.DeleteAsync(id);
-        if (job is null)
+    /// <summary>
+    /// Checks a building off (<paramref name="complete"/> true) or puts it back on the to-do list, recording which
+    /// technician did it and when. Only a technician assigned to the job may do this. Setting a building to the state
+    /// it is already in changes nothing, so two technicians ticking the same building keep the first one's name.
+    /// Returns null if the job or building doesn't exist or the technician isn't assigned to the job.
+    /// </summary>
+    public Task<Building?> SetBuildingCompleteAsync(Guid jobId, Guid buildingId, Guid technicianId, bool complete) =>
+        _jobs.UpdateAsync(jobId, job =>
         {
-            return false;
-        }
+            var building = job.Buildings.FirstOrDefault(b => b.Id == buildingId);
+            if (building is null || !job.AssignedTechnicianIds.Contains(technicianId))
+            {
+                return null;
+            }
 
-        foreach (var file in job.Buildings.SelectMany(b => b.UploadedFiles))
-        {
-            _fileStorage.Delete(file.StoredFileName);
-        }
+            if (complete && !building.IsComplete)
+            {
+                building.CompletedAtUtc = _timeProvider.GetUtcNow().UtcDateTime;
+                building.CompletedByTechnicianId = technicianId;
+            }
+            else if (!complete)
+            {
+                building.CompletedAtUtc = null;
+                building.CompletedByTechnicianId = null;
+            }
 
-        return true;
-    }
+            return building;
+        });
 
     /// <summary>
     /// Adds a building to the job. If the job is part of a recurring series, the building is also added to the
@@ -342,32 +354,9 @@ public class JobService
         return buildings;
     }
 
-    /// <summary>Removes a building and deletes its stored spreadsheets. Returns false if not found.</summary>
-    public async Task<bool> DeleteBuildingAsync(Guid jobId, Guid buildingId)
-    {
-        var removed = await _jobs.UpdateAsync(jobId, job =>
-        {
-            var building = job.Buildings.FirstOrDefault(b => b.Id == buildingId);
-            if (building is not null)
-            {
-                job.Buildings.Remove(building);
-            }
-
-            return building;
-        });
-
-        if (removed is null)
-        {
-            return false;
-        }
-
-        foreach (var file in removed.UploadedFiles)
-        {
-            _fileStorage.Delete(file.StoredFileName);
-        }
-
-        return true;
-    }
+    /// <summary>Removes a building from the job. Returns false if not found.</summary>
+    public Task<bool> DeleteBuildingAsync(Guid jobId, Guid buildingId) =>
+        _jobs.UpdateAsync(jobId, job => job.Buildings.RemoveAll(b => b.Id == buildingId) > 0);
 
     /// <summary>
     /// Validates <paramref name="input"/> and copies it onto <paramref name="job"/>.
@@ -404,6 +393,11 @@ public class JobService
             errors["Status"] = "Choose a valid status.";
         }
 
+        if (!JobFilesLink.TryNormalize(input.FilesUrl, out var filesUrl, out var filesUrlError))
+        {
+            errors["FilesUrl"] = filesUrlError!;
+        }
+
         var knownIds = (await _technicians.GetAllAsync()).Select(t => t.Id).ToHashSet();
         if (input.AssignedTechnicianIds.Any(id => !knownIds.Contains(id)))
         {
@@ -425,6 +419,7 @@ public class JobService
         job.EndTime = input.EndTime;
         job.Status = input.Status;
         job.Notes = Optional(input.Notes);
+        job.FilesUrl = filesUrl;
         job.SetAssignedTechnicians(input.AssignedTechnicianIds);
     }
 

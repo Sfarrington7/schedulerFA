@@ -1,0 +1,12 @@
+@* Progress bar for a job's building checklist ("2 of 5 buildings complete"). The data- hooks let the technician
+   checklist script update it in place. *@
+@model JobDetailsViewModel
+<div class="building-progress" data-progress>
+    <div class="d-flex justify-content-between gap-2 small mb-1">
+        <span class="fw-semibold" data-progress-text aria-live="polite">@Model.ProgressText</span>
+        <span class="text-body-secondary" data-progress-percent>@Model.ProgressPercent%</span>
+    </div>
+    <div class="progress" role="progressbar" aria-label="Buildings complete" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@Model.ProgressPercent">
+        <div class="progress-bar" style="width: @Model.ProgressPercent%" data-progress-bar></div>
+    </div>
+</div>

@@ -619,9 +619,85 @@ h1.h3 {
   text-decoration: none;
 }
 
-/* Large tap targets for file downloads in the field. */
-.file-link {
-  min-height: 2.75rem;
+/* Building checklist progress (job pages): a thin green bar under "2 of 5 buildings complete". */
+.building-progress .progress {
+  --bs-progress-height: .5rem;
+  --bs-progress-bg: var(--app-line);
+  --bs-progress-bar-bg: #16a34a;
+}
+
+/* Technician building checklist: big tap targets for gloved hands, one row per building. */
+.checklist-heading {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  margin: 1.25rem 0 .5rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.checklist-item {
+  padding: 0;
+}
+
+.checklist-label {
+  display: flex;
+  align-items: flex-start;
+  gap: .75rem;
+  min-height: 3rem;
+  margin: 0;
+  padding: .75rem 1rem;
+  cursor: pointer;
+}
+
+.checklist-label:has(:disabled) {
+  cursor: default;
+}
+
+.checklist-check {
+  flex-shrink: 0;
+  width: 1.5rem;
+  height: 1.5rem;
+  margin-top: 0;
+}
+
+.checklist-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.checklist-name {
+  font-weight: 600;
+  line-height: 1.5rem;
+}
+
+[data-list="done"] .checklist-name {
+  color: var(--app-muted);
+}
+
+.checklist-notes,
+.checklist-done {
+  font-size: .875rem;
+  color: var(--app-muted);
+}
+
+.checklist-done:empty {
+  display: none;
+}
+
+.checklist-save {
+  margin: 0 1rem .75rem 3.25rem;
+}
+
+.checklist-empty {
+  margin: 0;
+  padding: .75rem 1rem;
+  font-size: .875rem;
+  color: var(--app-muted);
+  border: 1px dashed var(--app-line-strong);
+  border-radius: var(--app-radius-sm);
 }
 
 /* Keep line breaks typed into notes fields. */
